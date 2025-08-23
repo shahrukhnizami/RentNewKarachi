@@ -32,7 +32,8 @@ import {
   Tab,
   IconButton,
   Fade,
-  Zoom
+  Zoom,
+  Tooltip
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -46,11 +47,15 @@ import {
   TrendingUp as TrendingUpIcon,
   Payment as PaymentIcon,
   History as HistoryIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  ElectricBolt as ElectricIcon,
+  LocalGasStation as GasIcon,
+  DirectionsCar as CarIcon,
+  Build as MaintenanceIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 // Tab panel component
@@ -77,6 +82,7 @@ export default function UserDashboard() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [userData, setUserData] = useState(null);
   const [rentHistory, setRentHistory] = useState([]);
+  const [billHistory, setBillHistory] = useState([]);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -91,6 +97,7 @@ export default function UserDashboard() {
   useEffect(() => {
     fetchUserData();
     fetchRentHistory();
+    fetchBillHistory();
   }, [currentUser]);
 
   const handleTabChange = (event, newValue) => {
@@ -133,6 +140,7 @@ export default function UserDashboard() {
     setSuccess('Refreshing data...');
     await fetchUserData();
     await fetchRentHistory();
+    await fetchBillHistory();
     setSuccess('Data refreshed successfully');
     setTimeout(() => setSuccess(''), 2000);
   };
@@ -149,16 +157,15 @@ export default function UserDashboard() {
       const rentsSnapshot = await getDocs(rentsQuery);
       const rentsList = rentsSnapshot.docs.map(doc => ({
         id: doc.id,
+        type: 'rent',
         ...doc.data()
       }));
       
-      // Sort the data in JavaScript instead of using Firestore orderBy
+      // Sort the data in JavaScript
       rentsList.sort((a, b) => {
-        // First sort by year (descending)
         if (b.year !== a.year) {
           return b.year - a.year;
         }
-        // Then sort by month (descending)
         const months = [
           'January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'
@@ -171,6 +178,104 @@ export default function UserDashboard() {
       console.error('Error fetching rent history:', error);
       setError('Failed to fetch rent history');
     }
+  };
+
+  const fetchBillHistory = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const billsCollection = collection(db, 'monthlyBills');
+      const billsQuery = query(
+        billsCollection, 
+        where('userId', '==', currentUser.uid)
+      );
+      const billsSnapshot = await getDocs(billsQuery);
+      const billsList = billsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        type: 'bill',
+        ...doc.data()
+      }));
+      
+      // Sort the data in JavaScript
+      billsList.sort((a, b) => {
+        if (b.year !== a.year) {
+          return b.year - a.year;
+        }
+        const months = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        return months.indexOf(b.month) - months.indexOf(a.month);
+      });
+      
+      setBillHistory(billsList);
+    } catch (error) {
+      console.error('Error fetching bill history:', error);
+      setError('Failed to fetch bill history');
+    }
+  };
+
+  // Calculate monthly summary for rent and bills
+  const calculateMonthlySummary = () => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Combine rent and bill histories
+    const combined = [...rentHistory, ...billHistory];
+    
+    // Group by month and year
+    const summary = {};
+    combined.forEach((transaction) => {
+      const key = `${transaction.month}-${transaction.year}`;
+      if (!summary[key]) {
+        summary[key] = {
+          month: transaction.month,
+          year: transaction.year,
+          totalRent: 0,
+          totalBills: 0,
+          totalReceivedRent: 0,
+          totalPaidBills: 0
+        };
+      }
+      
+      if (transaction.type === 'rent') {
+        summary[key].totalRent += Number(transaction.amount) || 0;
+        summary[key].totalReceivedRent += Number(transaction.receivedAmount) || 0;
+      } else {
+        summary[key].totalBills += Number(transaction.amount) || 0;
+        summary[key].totalPaidBills += Number(transaction.paidAmount) || 0;
+      }
+    });
+    
+    // Convert to array and sort
+    const summaryArray = Object.values(summary).sort((a, b) => {
+      if (b.year !== a.year) {
+        return b.year - a.year;
+      }
+      return months.indexOf(b.month) - months.indexOf(a.month);
+    });
+    
+    return summaryArray;
+  };
+
+  // Combine and sort rent and bill histories
+  const getConsolidatedTransactions = () => {
+    const combined = [...rentHistory, ...billHistory];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    combined.sort((a, b) => {
+      if (b.year !== a.year) {
+        return b.year - a.year;
+      }
+      return months.indexOf(b.month) - months.indexOf(a.month);
+    });
+    
+    return combined;
   };
 
   const handleOpenEditDialog = () => {
@@ -212,8 +317,57 @@ export default function UserDashboard() {
     }
   };
 
+  const getTransactionIcon = (type, billType) => {
+    if (type === 'rent') return <PaymentIcon />;
+    switch (billType) {
+      case 'electric': return <ElectricIcon />;
+      case 'ssgc': return <GasIcon />;
+      case 'motor': return <CarIcon />;
+      case 'maintenance': return <MaintenanceIcon />;
+      default: return <ReceiptIcon />;
+    }
+  };
+
+  const getTransactionTypeLabel = (type, billType) => {
+    if (type === 'rent') return 'Rent';
+    switch (billType) {
+      case 'electric': return 'Electric Bill';
+      case 'ssgc': return 'SSGC Bill';
+      case 'motor': return 'Motor Bill';
+      case 'maintenance': return 'Maintenance';
+      default: return billType || 'Bill';
+    }
+  };
+
   const calculateRemainingBalance = (amount, receivedAmount) => {
     return Math.max(0, amount - (receivedAmount || 0));
+  };
+
+  // Calculate total bills for the user
+  const calculateTotalBills = () => {
+    return billHistory.reduce((sum, bill) => sum + (bill.amount || 0), 0);
+  };
+
+  // Calculate total bills paid for the user
+  const calculateTotalBillsPaid = () => {
+    return billHistory.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
+  };
+
+  // Calculate total bills balance for the user
+  const calculateTotalBillsBalance = () => {
+    return calculateTotalBills() - calculateTotalBillsPaid();
+  };
+
+  // Calculate total rent balance for the user
+  const calculateTotalRentBalance = () => {
+    return rentHistory.reduce((sum, rent) => sum + calculateRemainingBalance(rent.amount, rent.receivedAmount), 0);
+  };
+
+  // Calculate total paid amount (rent + bills)
+  const calculateTotalPaidAmount = () => {
+    const totalRentPaid = rentHistory.reduce((sum, rent) => sum + (rent.receivedAmount || 0), 0);
+    const totalBillsPaid = billHistory.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
+    return totalRentPaid + totalBillsPaid;
   };
 
   // Calculate payment progress percentage
@@ -311,7 +465,7 @@ export default function UserDashboard() {
             <Alert 
               severity="error" 
               sx={{ mb: 2 }} 
-              onClose={() => setError('')}
+              onClose={() => setError.css('')}
             >
               {error}
             </Alert>
@@ -339,6 +493,68 @@ export default function UserDashboard() {
             Here's your rental overview and payment history.
           </Typography>
         </Box>
+
+        {/* Monthly Summary Section */}
+        <Paper sx={{ p: 3, borderRadius: 2, mb: 4 }}>
+          <Typography variant="h6" fontWeight="600" gutterBottom>
+            Monthly Payment Summary
+          </Typography>
+          
+          {calculateMonthlySummary().length > 0 ? (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Month/Year</TableCell>
+                    <TableCell>Total Rent</TableCell>
+                    <TableCell>Total Bills</TableCell>
+                    <TableCell>Total Amount</TableCell>
+                    <TableCell>Total Paid</TableCell>
+                    <TableCell>Total Balance</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {calculateMonthlySummary().map((summary, index) => (
+                    <TableRow key={index} hover>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2" fontWeight="500">
+                            {summary.month}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {summary.year}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>Rs. {summary.totalRent.toLocaleString()}</TableCell>
+                      <TableCell>Rs. {summary.totalBills.toLocaleString()}</TableCell>
+                      <TableCell>Rs. {(summary.totalRent + summary.totalBills).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Typography color="success.main">
+                          Rs. {(summary.totalReceivedRent + summary.totalPaidBills).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography 
+                          color={(summary.totalRent + summary.totalBills - summary.totalReceivedRent - summary.totalPaidBills) > 0 ? 'error.main' : 'success.main'}
+                        >
+                          Rs. {(summary.totalRent + summary.totalBills - summary.totalReceivedRent - summary.totalPaidBills).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                No monthly payment data available yet.
+              </Typography>
+            </Box>
+          )}
+        </Paper>
 
         {/* Statistics Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -398,55 +614,88 @@ export default function UserDashboard() {
           
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '300ms' }}>
-              <Card 
-                elevation={3}
-                sx={{ 
-                  borderRadius: 3,
-                  background: `linear-gradient(135deg, ${userData.balance > 0 ? theme.palette.error.light : theme.palette.info.light} 0%, ${userData.balance > 0 ? theme.palette.error.main : theme.palette.info.main} 100%)`,
-                  color: 'white',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                  <BalanceIcon sx={{ fontSize: 80 }} />
-                </Box>
-                <CardContent>
-                  <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                    {userData.balance > 0 ? 'Remaining Balance' : 'Account Status'}
-                  </Typography>
-                  <Typography variant="h5" fontWeight="600">
-                    Rs. {userData.balance || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
+              <Tooltip title="Total outstanding balance including rent and bills">
+                <Card 
+                  elevation={3}
+                  sx={{ 
+                    borderRadius: 3,
+                    background: `linear-gradient(135deg, ${userData.balance > 0 ? theme.palette.error.light : theme.palette.info.main} 0%, ${userData.balance > 0 ? theme.palette.error.main : theme.palette.info.main} 100%)`,
+                    color: 'white',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                    <BalanceIcon sx={{ fontSize: 80 }} />
+                  </Box>
+                  <CardContent>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
+                      Total Balance
+                    </Typography>
+                    <Typography variant="h5" fontWeight="600">
+                      Rs. {userData.balance || 0}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Tooltip>
             </Zoom>
           </Grid>
           
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '400ms' }}>
-              <Card 
-                elevation={3}
-                sx={{ 
-                  borderRadius: 3,
-                  background: `linear-gradient(135deg, ${theme.palette.warning.light} 0%, ${theme.palette.warning.main} 100%)`,
-                  color: 'white',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                  <TrendingUpIcon sx={{ fontSize: 80 }} />
-                </Box>
-                <CardContent>
-                  <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                    Advance Paid
-                  </Typography>
-                  <Typography variant="h5" fontWeight="600">
-                    Rs. {userData.advanceAmount || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
+              <Tooltip title="Outstanding balance for rent only">
+                <Card 
+                  elevation={3}
+                  sx={{ 
+                    borderRadius: 3,
+                    background: `linear-gradient(135deg, ${calculateTotalRentBalance() > 0 ? theme.palette.warning.light : theme.palette.info.main} 0%, ${calculateTotalRentBalance() > 0 ? theme.palette.warning.main : theme.palette.info.main} 100%)`,
+                    color: 'white',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                    <PaymentIcon sx={{ fontSize: 80 }} />
+                  </Box>
+                  <CardContent>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
+                      Rent Balance
+                    </Typography>
+                    <Typography variant="h5" fontWeight="600">
+                      Rs. {calculateTotalRentBalance().toLocaleString()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Tooltip>
+            </Zoom>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Zoom in={true} style={{ transitionDelay: '500ms' }}>
+              <Tooltip title="Outstanding balance for bills only">
+                <Card 
+                  elevation={3}
+                  sx={{ 
+                    borderRadius: 3,
+                    background: `linear-gradient(135deg, ${calculateTotalBillsBalance() > 0 ? theme.palette.warning.light : theme.palette.info.main} 0%, ${calculateTotalBillsBalance() > 0 ? theme.palette.warning.main : theme.palette.info.main} 100%)`,
+                    color: 'white',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                    <ReceiptIcon sx={{ fontSize: 80 }} />
+                  </Box>
+                  <CardContent>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
+                      Bills Balance
+                    </Typography>
+                    <Typography variant="h5" fontWeight="600">
+                      Rs. {calculateTotalBillsBalance().toLocaleString()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Tooltip>
             </Zoom>
           </Grid>
         </Grid>
@@ -517,6 +766,8 @@ export default function UserDashboard() {
             <Tab icon={<PersonIcon />} iconPosition="start" label="Profile" />
             <Tab icon={<PaymentIcon />} iconPosition="start" label="Payments" />
             <Tab icon={<HistoryIcon />} iconPosition="start" label="History" />
+            <Tab icon={<ReceiptIcon />} iconPosition="start" label="Bills" />
+            <Tab icon={<TrendingUpIcon />} iconPosition="start" label="All Transactions" />
           </Tabs>
 
           {/* Profile Tab */}
@@ -609,7 +860,7 @@ export default function UserDashboard() {
                       <Box sx={{ mb: 3, p: 2, backgroundColor: 'primary.light', borderRadius: 2 }}>
                         <Typography variant="body2" color="primary.contrastText" gutterBottom>Monthly Rent</Typography>
                         <Typography variant="h5" color="primary.contrastText" fontWeight="600">
-                          ${userData.monthlyRent || 0}
+                          Rs. {userData.monthlyRent || 0}
                         </Typography>
                       </Box>
                     </Grid>
@@ -622,14 +873,14 @@ export default function UserDashboard() {
                         borderRadius: 2 
                       }}>
                         <Typography variant="body2" color={userData.balance > 0 ? 'error.contrastText' : 'success.contrastText'} gutterBottom>
-                          Remaining Balance
+                          Total Balance
                         </Typography>
                         <Typography 
                           variant="h5" 
                           color={userData.balance > 0 ? 'error.contrastText' : 'success.contrastText'} 
                           fontWeight="600"
                         >
-                          ${userData.balance || 0}
+                          Rs. {userData.balance || 0}
                         </Typography>
                       </Box>
                     </Grid>
@@ -638,7 +889,7 @@ export default function UserDashboard() {
                       <Box sx={{ mb: 2, p: 2, backgroundColor: 'info.light', borderRadius: 2 }}>
                         <Typography variant="body2" color="info.contrastText" gutterBottom>Advance Amount</Typography>
                         <Typography variant="h6" color="info.contrastText" fontWeight="600">
-                          ${userData.advanceAmount || 0}
+                          Rs. {userData.advanceAmount || 0}
                         </Typography>
                       </Box>
                     </Grid>
@@ -680,7 +931,7 @@ export default function UserDashboard() {
                     <Grid item xs={12} sm={4}>
                       <Box sx={{ textAlign: 'center', p: 2, border: `2px solid ${theme.palette.primary.main}`, borderRadius: 2 }}>
                         <Typography variant="h6" color="primary">Monthly Rent</Typography>
-                        <Typography variant="h4" color="primary" fontWeight="700">${userData.monthlyRent || 0}</Typography>
+                        <Typography variant="h4" color="primary" fontWeight="700">Rs. {userData.monthlyRent || 0}</Typography>
                         <Typography variant="body2" color="text.secondary">Per Month</Typography>
                       </Box>
                     </Grid>
@@ -688,7 +939,7 @@ export default function UserDashboard() {
                     <Grid item xs={12} sm={4}>
                       <Box sx={{ textAlign: 'center', p: 2, border: `2px solid ${theme.palette.info.main}`, borderRadius: 2 }}>
                         <Typography variant="h6" color="info.main">Advance Paid</Typography>
-                        <Typography variant="h4" color="info.main" fontWeight="700">${userData.advanceAmount || 0}</Typography>
+                        <Typography variant="h4" color="info.main" fontWeight="700">Rs. {userData.advanceAmount || 0}</Typography>
                         <Typography variant="body2" color="text.secondary">Advance Amount</Typography>
                       </Box>
                     </Grid>
@@ -702,10 +953,10 @@ export default function UserDashboard() {
                         backgroundColor: userData.balance > 0 ? 'error.light' : 'success.light'
                       }}>
                         <Typography variant="h6" color={userData.balance > 0 ? 'error.main' : 'success.main'}>
-                          Remaining Balance
+                          Total Balance
                         </Typography>
                         <Typography variant="h4" color={userData.balance > 0 ? 'error.main' : 'success.main'} fontWeight="700">
-                          ${userData.balance || 0}
+                          Rs. {userData.balance || 0}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {userData.balance > 0 ? 'Outstanding' : 'All Paid'}
@@ -810,7 +1061,7 @@ export default function UserDashboard() {
                         </Button>
                       }
                     >
-                      You have an outstanding balance of ${userData.balance}
+                      You have an outstanding balance of Rs. {userData.balance}
                     </Alert>
                   )}
                 </Paper>
@@ -835,7 +1086,6 @@ export default function UserDashboard() {
                         <TableCell>Received</TableCell>
                         <TableCell>Balance</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Due Date</TableCell>
                         <TableCell>Paid Date</TableCell>
                       </TableRow>
                     </TableHead>
@@ -852,14 +1102,14 @@ export default function UserDashboard() {
                               </Typography>
                             </Box>
                           </TableCell>
-                          <TableCell>${rent.amount}</TableCell>
-                          <TableCell>${rent.receivedAmount || 0}</TableCell>
+                          <TableCell>Rs. {rent.amount}</TableCell>
+                          <TableCell>Rs. {rent.receivedAmount || 0}</TableCell>
                           <TableCell>
                             <Typography 
                               variant="body2" 
                               color={calculateRemainingBalance(rent.amount, rent.receivedAmount) > 0 ? 'error.main' : 'success.main'}
                             >
-                              ${calculateRemainingBalance(rent.amount, rent.receivedAmount)}
+                              Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount)}
                             </Typography>
                           </TableCell>
                           <TableCell>
@@ -870,7 +1120,6 @@ export default function UserDashboard() {
                               variant="outlined"
                             />
                           </TableCell>
-                          <TableCell>{rent.dueDate || 'N/A'}</TableCell>
                           <TableCell>{rent.paidDate || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
@@ -882,6 +1131,160 @@ export default function UserDashboard() {
                   <HistoryIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                   <Typography variant="body1" color="text.secondary">
                     No rent history available yet.
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </TabPanel>
+
+          {/* Bills Tab */}
+          <TabPanel value={tabValue} index={3}>
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" fontWeight="600" gutterBottom>
+                Bill Payment History
+              </Typography>
+              
+              {billHistory.length > 0 ? (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Bill Type</TableCell>
+                        <TableCell>Month/Year</TableCell>
+                        <TableCell>Amount</TableCell>
+                        <TableCell>Balance</TableCell>
+                        <TableCell>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {billHistory.map((bill) => (
+                        <TableRow key={bill.id} hover>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
+                                {getTransactionIcon(bill.type, bill.type)}
+                              </Avatar>
+                              <Typography variant="body2" fontWeight="500">
+                                {getTransactionTypeLabel(bill.type, bill.type)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="body2" fontWeight="500">
+                                {bill.month}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {bill.year}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>Rs. {bill.amount}</TableCell>
+                          <TableCell>
+                            <Typography 
+                              variant="body2" 
+                              color={calculateRemainingBalance(bill.amount, bill.paidAmount) > 0 ? 'error.main' : 'success.main'}
+                            >
+                              Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={bill.status} 
+                              color={getStatusColor(bill.status)}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                  <Typography variant="body1" color="text.secondary">
+                    No bill history available yet.
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </TabPanel>
+
+          {/* All Transactions Tab */}
+          <TabPanel value={tabValue} index={4}>
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" fontWeight="600" gutterBottom>
+                All Transactions
+              </Typography>
+              
+              {getConsolidatedTransactions().length > 0 ? (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Month/Year</TableCell>
+                        <TableCell>Amount</TableCell>
+                        <TableCell>Paid</TableCell>
+                        <TableCell>Balance</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Paid Date</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {getConsolidatedTransactions().map((transaction) => (
+                        <TableRow key={transaction.id} hover>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
+                                {getTransactionIcon(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
+                              </Avatar>
+                              <Typography variant="body2" fontWeight="500">
+                                {getTransactionTypeLabel(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="body2" fontWeight="500">
+                                {transaction.month}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {transaction.year}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>Rs. {transaction.amount}</TableCell>
+                          <TableCell>Rs. {transaction.receivedAmount || transaction.paidAmount || 0}</TableCell>
+                          <TableCell>
+                            <Typography 
+                              variant="body2" 
+                              color={calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount) > 0 ? 'error.main' : 'success.main'}
+                            >
+                              Rs. {calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={transaction.status} 
+                              color={getStatusColor(transaction.status)}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{transaction.paidDate || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <TrendingUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                  <Typography variant="body1" color="text.secondary">
+                    No transactions available yet.
                   </Typography>
                 </Box>
               )}
