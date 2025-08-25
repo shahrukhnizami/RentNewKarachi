@@ -73,21 +73,7 @@ import { auth } from '../firebase/config';
 import UserCard from './UserCard';
 
 // TabPanel component
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
 
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
-    </div>
-  );
-}
 
 // Main AdminDashboard component
 export default function AdminDashboard() {
@@ -1485,28 +1471,7 @@ export default function AdminDashboard() {
                     disabled={rentFormData.status === 'paid'}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth margin="normal">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={rentFormData.status}
-                      label="Status"
-                      onChange={(e) => {
-                        const newStatus = e.target.value;
-                        setRentFormData({
-                          ...rentFormData,
-                          status: newStatus,
-                          receivedAmount: newStatus === 'paid' ? rentFormData.amount : rentFormData.receivedAmount,
-                        });
-                      }}
-                      variant="outlined"
-                    >
-                      <MenuItem value="pending">Pending</MenuItem>
-                      <MenuItem value="paid">Paid</MenuItem>
-                      <MenuItem value="overdue">Overdue</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
+                
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
