@@ -5,12 +5,6 @@ import {
   Typography,
   Box,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
   Dialog,
   DialogTitle,
@@ -27,10 +21,7 @@ import {
   CardContent,
   AppBar,
   Toolbar,
-  Tabs,
-  Tab,
   Avatar,
-  Chip,
   LinearProgress,
   useTheme,
   useMediaQuery,
@@ -38,11 +29,14 @@ import {
   Zoom,
   Fab,
   InputAdornment,
-  Icon
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Add as AddIcon,
   Person as PersonIcon,
   AttachMoney as MoneyIcon,
@@ -50,35 +44,35 @@ import {
   Receipt as ReceiptIcon,
   Refresh as RefreshIcon,
   Dashboard as DashboardIcon,
-  TrendingUp as TrendingUpIcon,
   AccountBalance as BalanceIcon,
   Payment as PaymentIcon,
   ElectricBolt as ElectricIcon,
   LocalGasStation as GasIcon,
   Build as MaintenanceIcon,
   Visibility,
-  VisibilityOff
+  VisibilityOff,
 } from '@mui/icons-material';
 import WindPowerIcon from '@mui/icons-material/WindPower';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
   addDoc,
   query,
   where,
   getDoc,
-  serverTimestamp
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import UserCard from './UserCard';
 
-// Tab panel component
+// TabPanel component
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
 
@@ -95,6 +89,7 @@ function TabPanel(props) {
   );
 }
 
+// Main AdminDashboard component
 export default function AdminDashboard() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -109,9 +104,24 @@ export default function AdminDashboard() {
   const [editingUser, setEditingUser] = useState(null);
   const [editingRent, setEditingRent] = useState(null);
   const [editingBill, setEditingBill] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState('all'); // New state for selected user in Bills Management
+  const [selectedMonth, setSelectedMonth] = useState(
+    [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ][new Date().getMonth()]
+  );
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -122,7 +132,7 @@ export default function AdminDashboard() {
     advanceAmount: 0,
     advanceDate: '',
     rentStartDate: '',
-    rentEndDate: ''
+    rentEndDate: '',
   });
   const [rentFormData, setRentFormData] = useState({
     userId: '',
@@ -133,7 +143,7 @@ export default function AdminDashboard() {
     receivedAmount: 0,
     status: 'pending',
     paidDate: '',
-    notes: ''
+    notes: '',
   });
   const [billFormData, setBillFormData] = useState({
     userId: '',
@@ -145,11 +155,36 @@ export default function AdminDashboard() {
     paidAmount: 0,
     status: 'pending',
     paidDate: '',
-    notes: ''
+    notes: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i).map(String);
+
+  const billTypes = [
+    { value: 'electric', label: 'Electric Bill' },
+    { value: 'ssgc', label: 'SSGC Bill' },
+    { value: 'motor', label: 'Motor Bill' },
+    { value: 'maintenance', label: 'Maintenance Charges' },
+  ];
 
   useEffect(() => {
     fetchUsers();
@@ -171,9 +206,9 @@ export default function AdminDashboard() {
       setLoading(true);
       const usersCollection = collection(db, 'users');
       const usersSnapshot = await getDocs(usersCollection);
-      const usersList = usersSnapshot.docs.map(doc => ({
+      const usersList = usersSnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
       setUsers(usersList);
     } catch (error) {
@@ -188,10 +223,10 @@ export default function AdminDashboard() {
     try {
       const rentsCollection = collection(db, 'monthlyRents');
       const rentsSnapshot = await getDocs(rentsCollection);
-      const rentsList = rentsSnapshot.docs.map(doc => ({
+      const rentsList = rentsSnapshot.docs.map((doc) => ({
         id: doc.id,
         type: 'rent',
-        ...doc.data()
+        ...doc.data(),
       }));
       setMonthlyRents(rentsList);
     } catch (error) {
@@ -204,10 +239,10 @@ export default function AdminDashboard() {
     try {
       const billsCollection = collection(db, 'monthlyBills');
       const billsSnapshot = await getDocs(billsCollection);
-      const billsList = billsSnapshot.docs.map(doc => ({
+      const billsList = billsSnapshot.docs.map((doc) => ({
         id: doc.id,
         type: 'bill',
-        ...doc.data()
+        ...doc.data(),
       }));
       setMonthlyBills(billsList);
     } catch (error) {
@@ -216,48 +251,96 @@ export default function AdminDashboard() {
     }
   };
 
-  // Calculate total amount and received amount for a user
-  const calculateUserAmounts = (userId) => {
-    const userRents = monthlyRents.filter(rent => rent.userId === userId);
-    const userBills = monthlyBills.filter(bill => bill.userId === userId);
+  const calculateMonthlyReceivedAmounts = () => {
+    const receivedByUser = users.map((user) => {
+      const userRents = monthlyRents.filter(
+        (rent) => rent.userId === user.id && rent.month === selectedMonth && rent.year === selectedYear
+      );
+      const userBills = monthlyBills.filter(
+        (bill) => bill.userId === user.id && bill.month === selectedMonth && bill.year === selectedYear
+      );
 
-    const totalRentAmount = userRents.reduce((sum, rent) => sum + (Number(rent.amount) || 0), 0);
-    const totalRentReceived = userRents.reduce((sum, rent) => sum + (Number(rent.receivedAmount) || 0), 0);
-    
-    const totalBillAmount = userBills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
-    const totalBillPaid = userBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
+      const totalReceivedRent = userRents.reduce((sum, rent) => sum + (Number(rent.receivedAmount) || 0), 0);
+      const totalPaidBill = userBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
+      const totalReceived = totalReceivedRent + totalPaidBill;
 
-    const totalAmount = totalRentAmount + totalBillAmount;
-    const totalReceived = totalRentReceived + totalBillPaid;
+      return {
+        userId: user.id,
+        userName: `${user.firstName} ${user.lastName}`,
+        totalReceived,
+      };
+    });
 
-    return { totalAmount, totalReceived };
+    const totalReceivedAllUsers = receivedByUser.reduce((sum, user) => sum + user.totalReceived, 0);
+
+    return { receivedByUser, totalReceivedAllUsers };
   };
 
-  // Calculate totals for filtered bills in Bills Management tab
+  const updateRentEntry = async (rent) => {
+    try {
+      await updateDoc(doc(db, 'monthlyRents', rent.id), {
+        userId: rent.userId,
+        userName: rent.userName,
+        month: rent.month,
+        year: rent.year,
+        amount: Number(rent.amount),
+        receivedAmount: Number(rent.receivedAmount),
+        status: rent.status,
+        paidDate: rent.paidDate,
+        notes: rent.notes,
+        updatedAt: serverTimestamp(),
+      });
+
+      const totalRemainingBalance = await calculateUserTotalBalance(rent.userId);
+      await updateDoc(doc(db, 'users', rent.userId), {
+        balance: totalRemainingBalance,
+      });
+
+      setSuccess('Rent entry updated successfully');
+      fetchMonthlyRents();
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating rent entry:', error);
+      setError('Failed to update rent entry');
+    }
+  };
+
+  const updateBillEntry = async (bill) => {
+    try {
+      await updateDoc(doc(db, 'monthlyBills', bill.id), {
+        userId: bill.userId,
+        userName: bill.userName,
+        month: bill.month,
+        year: bill.year,
+        type: bill.type,
+        amount: Number(bill.amount),
+        paidAmount: Number(bill.paidAmount),
+        status: bill.status,
+        paidDate: bill.paidDate,
+        notes: bill.notes,
+        updatedAt: serverTimestamp(),
+      });
+
+      const totalRemainingBalance = await calculateUserTotalBalance(bill.userId);
+      await updateDoc(doc(db, 'users', bill.userId), {
+        balance: totalRemainingBalance,
+      });
+
+      setSuccess('Bill entry updated successfully');
+      fetchMonthlyBills();
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating bill entry:', error);
+      setError('Failed to update bill entry');
+    }
+  };
+
   const calculateBillsTotals = (userId) => {
-    const filteredBills = userId === 'all' ? monthlyBills : monthlyBills.filter(bill => bill.userId === userId);
+    const filteredBills = userId === 'all' ? monthlyBills : monthlyBills.filter((bill) => bill.userId === userId);
     const totalBills = filteredBills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
     const totalBillsPaid = filteredBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
     const totalBillsBalance = totalBills - totalBillsPaid;
     return { totalBills, totalBillsPaid, totalBillsBalance };
-  };
-
-  // Combine and sort rent and bill records
-  const getConsolidatedTransactions = () => {
-    const combined = [...monthlyRents, ...monthlyBills];
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    combined.sort((a, b) => {
-      if (b.year !== a.year) {
-        return b.year - a.year;
-      }
-      return months.indexOf(b.month) - months.indexOf(a.month);
-    });
-    
-    return combined;
   };
 
   const handleOpenDialog = (user = null) => {
@@ -273,7 +356,7 @@ export default function AdminDashboard() {
         advanceAmount: user.advanceAmount || 0,
         advanceDate: user.advanceDate || '',
         rentStartDate: user.rentStartDate || '',
-        rentEndDate: user.rentEndDate || ''
+        rentEndDate: user.rentEndDate || '',
       });
     } else {
       setEditingUser(null);
@@ -287,13 +370,13 @@ export default function AdminDashboard() {
         advanceAmount: 0,
         advanceDate: '',
         rentStartDate: '',
-        rentEndDate: ''
+        rentEndDate: '',
       });
     }
     setOpenDialog(true);
   };
 
-  const handleOpenRentDialog = (rent = null) => {
+  const handleOpenRentDialog = (rent = null, prefill = {}) => {
     if (rent) {
       setEditingRent(rent);
       setRentFormData({
@@ -305,7 +388,7 @@ export default function AdminDashboard() {
         receivedAmount: rent.receivedAmount || 0,
         status: rent.status || 'pending',
         paidDate: rent.paidDate || '',
-        notes: rent.notes || ''
+        notes: rent.notes || '',
       });
     } else {
       setEditingRent(null);
@@ -318,13 +401,14 @@ export default function AdminDashboard() {
         receivedAmount: 0,
         status: 'pending',
         paidDate: '',
-        notes: ''
+        notes: '',
+        ...prefill,
       });
     }
     setOpenRentDialog(true);
   };
 
-  const handleOpenBillDialog = (bill = null) => {
+  const handleOpenBillDialog = (bill = null, prefill = {}) => {
     if (bill) {
       setEditingBill(bill);
       setBillFormData({
@@ -337,7 +421,7 @@ export default function AdminDashboard() {
         paidAmount: bill.paidAmount || 0,
         status: bill.status || 'pending',
         paidDate: bill.paidDate || '',
-        notes: bill.notes || ''
+        notes: bill.notes || '',
       });
     } else {
       setEditingBill(null);
@@ -351,7 +435,8 @@ export default function AdminDashboard() {
         paidAmount: 0,
         status: 'pending',
         paidDate: '',
-        notes: ''
+        notes: '',
+        ...prefill,
       });
     }
     setOpenBillDialog(true);
@@ -370,7 +455,7 @@ export default function AdminDashboard() {
       advanceAmount: 0,
       advanceDate: '',
       rentStartDate: '',
-      rentEndDate: ''
+      rentEndDate: '',
     });
     setShowPassword(false);
   };
@@ -387,7 +472,7 @@ export default function AdminDashboard() {
       receivedAmount: 0,
       status: 'pending',
       paidDate: '',
-      notes: ''
+      notes: '',
     });
   };
 
@@ -404,7 +489,7 @@ export default function AdminDashboard() {
       paidAmount: 0,
       status: 'pending',
       paidDate: '',
-      notes: ''
+      notes: '',
     });
   };
 
@@ -420,16 +505,11 @@ export default function AdminDashboard() {
           advanceDate: formData.advanceDate,
           rentStartDate: formData.rentStartDate,
           rentEndDate: formData.rentEndDate,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
         setSuccess('User updated successfully');
       } else {
-        const userCredential = await createUserWithEmailAndPassword(
-          auth, 
-          formData.email, 
-          formData.password
-        );
-        
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const newUserData = {
           uid: userCredential.user.uid,
           firstName: formData.firstName,
@@ -442,12 +522,10 @@ export default function AdminDashboard() {
           rentStartDate: formData.rentStartDate,
           rentEndDate: formData.rentEndDate,
           balance: 0,
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
         };
-        
         await addDoc(collection(db, 'users'), newUserData);
         await generateRentEntries(newUserData);
-        
         setSuccess('User added successfully and rent entries generated');
       }
       handleCloseDialog();
@@ -460,30 +538,20 @@ export default function AdminDashboard() {
 
   const generateRentEntries = async (userData) => {
     if (!userData.rentStartDate || !userData.rentEndDate) return;
-    
     const startDate = new Date(userData.rentStartDate);
     const endDate = new Date(userData.rentEndDate);
     const monthlyRent = userData.monthlyRent || 0;
-    
     const currentDate = new Date(startDate);
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
     while (currentDate <= endDate) {
       const month = months[currentDate.getMonth()];
       const year = currentDate.getFullYear();
-      
       const existingRentQuery = query(
         collection(db, 'monthlyRents'),
         where('userId', '==', userData.uid || userData.id),
         where('month', '==', month),
         where('year', '==', year)
       );
-      
       const existingRentSnapshot = await getDocs(existingRentQuery);
-      
       if (existingRentSnapshot.empty) {
         await addDoc(collection(db, 'monthlyRents'), {
           userId: userData.uid || userData.id,
@@ -496,10 +564,9 @@ export default function AdminDashboard() {
           paidDate: '',
           notes: 'Auto-generated rent entry',
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
       }
-      
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
   };
@@ -510,9 +577,8 @@ export default function AdminDashboard() {
       const updatedRentFormData = {
         ...rentFormData,
         paidDate: rentFormData.status === 'paid' ? (rentFormData.paidDate || currentDate) : '',
-        receivedAmount: rentFormData.status === 'paid' ? Number(rentFormData.amount) : Number(rentFormData.receivedAmount)
+        receivedAmount: rentFormData.status === 'paid' ? Number(rentFormData.amount) : Number(rentFormData.receivedAmount),
       };
-
       if (editingRent) {
         await updateDoc(doc(db, 'monthlyRents', editingRent.id), {
           userId: updatedRentFormData.userId,
@@ -524,14 +590,12 @@ export default function AdminDashboard() {
           status: updatedRentFormData.status,
           paidDate: updatedRentFormData.paidDate,
           notes: updatedRentFormData.notes,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
-
         const totalRemainingBalance = await calculateUserTotalBalance(updatedRentFormData.userId);
         await updateDoc(doc(db, 'users', updatedRentFormData.userId), {
-          balance: totalRemainingBalance
+          balance: totalRemainingBalance,
         });
-
         setSuccess('Rent entry updated successfully');
       } else {
         await addDoc(collection(db, 'monthlyRents'), {
@@ -545,14 +609,12 @@ export default function AdminDashboard() {
           paidDate: updatedRentFormData.paidDate,
           notes: updatedRentFormData.notes,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
-
         const totalRemainingBalance = await calculateUserTotalBalance(updatedRentFormData.userId);
         await updateDoc(doc(db, 'users', updatedRentFormData.userId), {
-          balance: totalRemainingBalance
+          balance: totalRemainingBalance,
         });
-
         setSuccess('Rent entry added successfully');
       }
       handleCloseRentDialog();
@@ -570,9 +632,8 @@ export default function AdminDashboard() {
       const updatedBillFormData = {
         ...billFormData,
         paidDate: billFormData.status === 'paid' ? (billFormData.paidDate || currentDate) : '',
-        paidAmount: billFormData.status === 'paid' ? Number(billFormData.amount) : Number(billFormData.paidAmount)
+        paidAmount: billFormData.status === 'paid' ? Number(billFormData.amount) : Number(billFormData.paidAmount),
       };
-
       if (editingBill) {
         await updateDoc(doc(db, 'monthlyBills', editingBill.id), {
           userId: updatedBillFormData.userId,
@@ -585,14 +646,12 @@ export default function AdminDashboard() {
           status: updatedBillFormData.status,
           paidDate: updatedBillFormData.paidDate,
           notes: updatedBillFormData.notes,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
-
         const totalRemainingBalance = await calculateUserTotalBalance(updatedBillFormData.userId);
         await updateDoc(doc(db, 'users', updatedBillFormData.userId), {
-          balance: totalRemainingBalance
+          balance: totalRemainingBalance,
         });
-
         setSuccess('Bill entry updated successfully');
       } else {
         await addDoc(collection(db, 'monthlyBills'), {
@@ -607,14 +666,12 @@ export default function AdminDashboard() {
           paidDate: updatedBillFormData.paidDate,
           notes: updatedBillFormData.notes,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
-
         const totalRemainingBalance = await calculateUserTotalBalance(updatedBillFormData.userId);
         await updateDoc(doc(db, 'users', updatedBillFormData.userId), {
-          balance: totalRemainingBalance
+          balance: totalRemainingBalance,
         });
-
         setSuccess('Bill entry added successfully');
       }
       handleCloseBillDialog();
@@ -645,16 +702,13 @@ export default function AdminDashboard() {
         const rentDoc = await getDoc(doc(db, 'monthlyRents', rentId));
         const rentData = rentDoc.data();
         const userId = rentData?.userId;
-        
         await deleteDoc(doc(db, 'monthlyRents', rentId));
-        
         if (userId) {
           const totalRemainingBalance = await calculateUserTotalBalance(userId);
           await updateDoc(doc(db, 'users', userId), {
-            balance: totalRemainingBalance
+            balance: totalRemainingBalance,
           });
         }
-        
         setSuccess('Rent entry deleted successfully');
         fetchMonthlyRents();
         fetchUsers();
@@ -671,16 +725,13 @@ export default function AdminDashboard() {
         const billDoc = await getDoc(doc(db, 'monthlyBills', billId));
         const billData = billDoc.data();
         const userId = billData?.userId;
-        
         await deleteDoc(doc(db, 'monthlyBills', billId));
-        
         if (userId) {
           const totalRemainingBalance = await calculateUserTotalBalance(userId);
           await updateDoc(doc(db, 'users', userId), {
-            balance: totalRemainingBalance
+            balance: totalRemainingBalance,
           });
         }
-        
         setSuccess('Bill entry deleted successfully');
         fetchMonthlyBills();
         fetchUsers();
@@ -692,20 +743,20 @@ export default function AdminDashboard() {
   };
 
   const handleUserSelect = (userId, isRent = true) => {
-    const selectedUser = users.find(user => user.id === userId);
+    const selectedUser = users.find((user) => user.id === userId);
     if (selectedUser) {
       if (isRent) {
         setRentFormData({
           ...rentFormData,
           userId: selectedUser.id,
           userName: `${selectedUser.firstName} ${selectedUser.lastName}`,
-          amount: selectedUser.monthlyRent || 0
+          amount: selectedUser.monthlyRent || 0,
         });
       } else {
         setBillFormData({
           ...billFormData,
           userId: selectedUser.id,
-          userName: `${selectedUser.firstName} ${selectedUser.lastName}`
+          userName: `${selectedUser.firstName} ${selectedUser.lastName}`,
         });
       }
     }
@@ -717,32 +768,46 @@ export default function AdminDashboard() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'paid': return 'success';
-      case 'pending': return 'warning';
-      case 'overdue': return 'error';
-      default: return 'default';
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'overdue':
+        return 'error';
+      default:
+        return 'default';
     }
   };
 
   const getTransactionIcon = (type, billType) => {
     if (type === 'rent') return <PaymentIcon />;
     switch (billType) {
-      case 'electric': return <ElectricIcon />;
-      case 'ssgc': return <GasIcon />;
-      case 'motor': return <WindPowerIcon />;
-      case 'maintenance': return <MaintenanceIcon />;
-      default: return <ReceiptIcon />;
+      case 'electric':
+        return <ElectricIcon />;
+      case 'ssgc':
+        return <GasIcon />;
+      case 'motor':
+        return <WindPowerIcon />;
+      case 'maintenance':
+        return <MaintenanceIcon />;
+      default:
+        return <ReceiptIcon />;
     }
   };
 
   const getTransactionTypeLabel = (type, billType) => {
     if (type === 'rent') return 'Rent';
     switch (billType) {
-      case 'electric': return 'Electric Bill';
-      case 'ssgc': return 'SSGC Bill';
-      case 'motor': return 'Motor Bill';
-      case 'maintenance': return 'Maintenance';
-      default: return billType || 'Bill';
+      case 'electric':
+        return 'Electric Bill';
+      case 'ssgc':
+        return 'SSGC Bill';
+      case 'motor':
+        return 'Motor Bill';
+      case 'maintenance':
+        return 'Maintenance';
+      default:
+        return billType || 'Bill';
     }
   };
 
@@ -752,42 +817,30 @@ export default function AdminDashboard() {
 
   const calculateUserTotalBalance = async (userId) => {
     try {
-      const rentsQuery = query(
-        collection(db, 'monthlyRents'),
-        where('userId', '==', userId)
-      );
+      const rentsQuery = query(collection(db, 'monthlyRents'), where('userId', '==', userId));
       const rentsSnapshot = await getDocs(rentsQuery);
-      const userRents = rentsSnapshot.docs.map(doc => doc.data());
-      
+      const userRents = rentsSnapshot.docs.map((doc) => doc.data());
       let totalRentBalance = 0;
-      userRents.forEach(rent => {
+      userRents.forEach((rent) => {
         const rentAmount = Number(rent.amount) || 0;
         const receivedAmount = Number(rent.receivedAmount) || 0;
         const remainingAmount = Math.max(0, rentAmount - receivedAmount);
-        
         if (rent.status === 'pending' || rent.status === 'overdue') {
           totalRentBalance += remainingAmount;
         }
       });
-
-      const billsQuery = query(
-        collection(db, 'monthlyBills'),
-        where('userId', '==', userId)
-      );
+      const billsQuery = query(collection(db, 'monthlyBills'), where('userId', '==', userId));
       const billsSnapshot = await getDocs(billsQuery);
-      const userBills = billsSnapshot.docs.map(doc => doc.data());
-      
+      const userBills = billsSnapshot.docs.map((doc) => doc.data());
       let totalBillBalance = 0;
-      userBills.forEach(bill => {
+      userBills.forEach((bill) => {
         const billAmount = Number(bill.amount) || 0;
         const paidAmount = Number(bill.paidAmount) || 0;
         const remainingAmount = Math.max(0, billAmount - paidAmount);
-        
         if (bill.status === 'pending' || bill.status === 'overdue') {
           totalBillBalance += remainingAmount;
         }
       });
-      
       return totalRentBalance + totalBillBalance;
     } catch (error) {
       console.error('Error calculating user balance:', error);
@@ -798,14 +851,12 @@ export default function AdminDashboard() {
   const recalculateAllUserBalances = async () => {
     try {
       setSuccess('Recalculating all user balances...');
-      
       for (const user of users) {
         const totalRemainingBalance = await calculateUserTotalBalance(user.id);
         await updateDoc(doc(db, 'users', user.id), {
-          balance: totalRemainingBalance
+          balance: totalRemainingBalance,
         });
       }
-      
       setSuccess('All user balances recalculated successfully');
       fetchUsers();
     } catch (error) {
@@ -823,45 +874,28 @@ export default function AdminDashboard() {
     setTimeout(() => setSuccess(''), 2000);
   };
 
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const billTypes = [
-    { value: 'electric', label: 'Electric Bill' },
-    { value: 'ssgc', label: 'SSGC Bill' },
-    { value: 'motor', label: 'Motor Bill' },
-    { value: 'maintenance', label: 'Maintenance Charges' }
-  ];
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
   if (loading) {
     return (
-      <Box 
-        display="flex" 
-        justifyContent="center" 
-        alignItems="center" 
-        minHeight="100vh"
-        flexDirection="column"
-      >
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh" flexDirection="column">
         <Avatar sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main' }}>
           <DashboardIcon fontSize="large" />
         </Avatar>
-        <Typography variant="h6" gutterBottom>Loading Admin Dashboard...</Typography>
+        <Typography variant="h6" gutterBottom>
+          Loading Admin Dashboard...
+        </Typography>
         <LinearProgress sx={{ width: '50%', maxWidth: 300, mt: 2 }} />
       </Box>
     );
   }
 
+  const { receivedByUser, totalReceivedAllUsers } = calculateMonthlyReceivedAmounts();
+
   return (
     <>
-      <AppBar 
-        position="sticky" 
+      <AppBar
+        position="sticky"
         elevation={2}
-        sx={{ 
+        sx={{
           background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
         }}
       >
@@ -872,40 +906,27 @@ export default function AdminDashboard() {
               Admin Dashboard
             </Typography>
           </Box>
-          
           <Box display="flex" alignItems="center">
-            <Avatar 
-              sx={{ 
-                width: 40, 
-                height: 40, 
+            <Avatar
+              sx={{
+                width: 40,
+                height: 40,
                 mr: 1,
                 bgcolor: 'secondary.main',
-                fontSize: '1rem'
+                fontSize: '1rem',
               }}
             >
               {currentUser?.displayName?.charAt(0) || currentUser?.email?.charAt(0) || 'A'}
             </Avatar>
-            
             {!isMobile && (
               <Typography variant="body2" sx={{ mr: 2 }}>
                 {currentUser?.displayName || currentUser?.email}
               </Typography>
             )}
-            
-            <IconButton 
-              color="inherit" 
-              onClick={refreshAllData}
-              sx={{ mr: 1 }}
-              size="large"
-            >
+            <IconButton color="inherit" onClick={refreshAllData} sx={{ mr: 1 }} size="large">
               <RefreshIcon />
             </IconButton>
-            
-            <IconButton 
-              color="inherit" 
-              onClick={handleLogout}
-              size="large"
-            >
+            <IconButton color="inherit" onClick={handleLogout} size="large">
               <LogoutIcon />
             </IconButton>
           </Box>
@@ -915,23 +936,14 @@ export default function AdminDashboard() {
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         {error && (
           <Fade in={!!error}>
-            <Alert 
-              severity="error" 
-              sx={{ mb: 2 }} 
-              onClose={() => setError('')}
-            >
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
               {error}
             </Alert>
           </Fade>
         )}
-        
         {success && (
           <Fade in={!!success}>
-            <Alert 
-              severity="success" 
-              sx={{ mb: 2 }} 
-              onClose={() => setSuccess('')}
-            >
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
               {success}
             </Alert>
           </Fade>
@@ -946,17 +958,104 @@ export default function AdminDashboard() {
           </Typography>
         </Box>
 
+        {/* Monthly Received Amounts Section */}
+        <Paper elevation={2} sx={{ borderRadius: 3, mb: 4, p: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+            <Typography variant="h6" fontWeight="600">
+              Monthly Received Amounts ({selectedMonth} {selectedYear})
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <FormControl sx={{ minWidth: 120 }}>
+                <InputLabel>Month</InputLabel>
+                <Select
+                  value={selectedMonth}
+                  label="Month"
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  variant="outlined"
+                >
+                  {months.map((month) => (
+                    <MenuItem key={month} value={month}>
+                      {month}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl sx={{ minWidth: 100 }}>
+                <InputLabel>Year</InputLabel>
+                <Select
+                  value={selectedYear}
+                  label="Year"
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  variant="outlined"
+                >
+                  {years.map((year) => (
+                    <MenuItem key={year} value={year}>
+                      {year}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+          <TableContainer>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Tenant</TableCell>
+                  <TableCell align="right">Total Received (Rs.)</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {receivedByUser.map((user) => (
+                  <TableRow key={user.userId} hover>
+                    <TableCell>
+                      <Typography variant="body1" fontWeight="500">
+                        {user.userName}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body1" color="success.main">
+                        Rs. {user.totalReceived.toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="body1" fontWeight="600">
+                      Total
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body1" fontWeight="600" color="success.main">
+                      Rs. {totalReceivedAllUsers.toLocaleString()}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {receivedByUser.every((user) => user.totalReceived === 0) && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                No payments received for {selectedMonth} {selectedYear}.
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '100ms' }}>
-              <Card 
+              <Card
                 elevation={3}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
                   color: 'white',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
                 }}
               >
                 <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
@@ -973,17 +1072,16 @@ export default function AdminDashboard() {
               </Card>
             </Zoom>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '200ms' }}>
-              <Card 
+              <Card
                 elevation={3}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
                   color: 'white',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
                 }}
               >
                 <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
@@ -1000,17 +1098,16 @@ export default function AdminDashboard() {
               </Card>
             </Zoom>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '300ms' }}>
-              <Card 
+              <Card
                 elevation={3}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   background: `linear-gradient(135deg, ${theme.palette.warning.light} 0%, ${theme.palette.warning.main} 100%)`,
                   color: 'white',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
                 }}
               >
                 <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
@@ -1027,21 +1124,20 @@ export default function AdminDashboard() {
               </Card>
             </Zoom>
           </Grid>
-          
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '400ms' }}>
-              <Card 
+              <Card
                 elevation={3}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   background: `linear-gradient(135deg, ${theme.palette.info.light} 0%, ${theme.palette.info.main} 100%)`,
                   color: 'white',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
                 }}
               >
                 <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                  <TrendingUpIcon sx={{ fontSize: 80 }} />
+                  <ReceiptIcon sx={{ fontSize: 80 }} />
                 </Box>
                 <CardContent>
                   <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
@@ -1057,500 +1153,52 @@ export default function AdminDashboard() {
         </Grid>
 
         <Paper elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-          <Tabs
-            value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
-            variant="fullWidth"
-            indicatorColor="primary"
-            textColor="primary"
-            sx={{ 
-              borderBottom: 1, 
-              borderColor: 'divider',
-              '& .MuiTab-root': {
-                py: 2,
-                fontWeight: 500
-              }
-            }}
-          >
-            <Tab icon={<PersonIcon />} iconPosition="start" label="User Management" />
-            <Tab icon={<PaymentIcon />} iconPosition="start" label="Rent Management" />
-            <Tab icon={<ReceiptIcon />} iconPosition="start" label="Bills Management" />
-            <Tab icon={<TrendingUpIcon />} iconPosition="start" label="Consolidated Transactions" />
-          </Tabs>
-
-          <TabPanel value={activeTab} index={0}>
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Typography variant="h6" fontWeight="600">User Management</Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  onClick={recalculateAllUserBalances}
-                  startIcon={<RefreshIcon />}
-                >
-                  Recalculate Balances
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpenDialog()}
-                >
-                  Add Tenant
-                </Button>
-              </Box>
-            </Box>
-            
-            <TableContainer>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>User</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Monthly Rent</TableCell>
-                    <TableCell>Total Amount</TableCell>
-                    <TableCell>Received Payment</TableCell>
-                    <TableCell>Total Balance</TableCell>
-                    <TableCell>Advance</TableCell>
-                    <TableCell>Rent Period</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((user) => {
-                    const { totalAmount, totalReceived } = calculateUserAmounts(user.id);
-                    return (
-                      <TableRow key={user.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar 
-                              sx={{ 
-                                width: 40, 
-                                height: 40, 
-                                mr: 2,
-                                bgcolor: 'primary.main',
-                                fontSize: '1rem'
-                              }}
-                            >
-                              {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body1" fontWeight="500">
-                                {user.firstName} {user.lastName}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Joined: {user.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={user.role} 
-                            color={user.role === 'admin' ? 'primary' : 'default'}
-                            size="small"
-                            variant={user.role === 'admin' ? 'filled' : 'outlined'}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body1" fontWeight="500">
-                            Rs. {user.monthlyRent || 0}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body1" fontWeight="500">
-                            Rs. {totalAmount.toLocaleString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography 
-                            variant="body1" 
-                            fontWeight="500"
-                            color="success.main"
-                          >
-                            Rs. {totalReceived.toLocaleString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography 
-                            variant="body1" 
-                            fontWeight="500"
-                            color={user.balance > 0 ? 'error.main' : 'success.main'}
-                          >
-                            Rs. {user.balance || 0}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body1">
-                            Rs. {user.advanceAmount || 0}
-                          </Typography>
-                          {user.advanceDate && (
-                            <Typography variant="caption" display="block" color="text.secondary">
-                              {user.advanceDate}
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {user.rentStartDate && user.rentEndDate 
-                            ? (
-                              <Box>
-                                <Typography variant="body2">{user.rentStartDate}</Typography>
-                                <Typography variant="body2">to</Typography>
-                                <Typography variant="body2">{user.rentEndDate}</Typography>
-                              </Box>
-                            )
-                            : 'N/A'
-                          }
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton 
-                            onClick={() => handleOpenDialog(user)}
-                            color="primary"
-                            size="large"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton 
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={user.id === currentUser.uid}
-                            color="error"
-                            size="large"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
-
-          <TabPanel value={activeTab} index={1}>
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Typography variant="h6" fontWeight="600">Rent Management</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenRentDialog()}
-              >
-                Add Rent Entry
+          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Typography variant="h6" fontWeight="600">
+              User Management
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" onClick={recalculateAllUserBalances} startIcon={<RefreshIcon />}>
+                Recalculate Balances
+              </Button>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+                Add Tenant
               </Button>
             </Box>
-            
-            <TableContainer>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Tenant</TableCell>
-                    <TableCell>Period</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Received</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Paid Date</TableCell>
-                    <TableCell>Balance</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {monthlyRents.map((rent) => (
-                    <TableRow key={rent.id} hover>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {rent.userName}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {rent.month}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {rent.year}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>Rs. {rent.amount}</TableCell>
-                      <TableCell>Rs. {rent.receivedAmount}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={rent.status} 
-                          color={getStatusColor(rent.status)}
-                          size="small"
-                          variant="filled"
-                        />
-                      </TableCell>
-                      <TableCell>{rent.paidDate || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body1" 
-                          fontWeight="500"
-                          color={calculateRemainingBalance(rent.amount, rent.receivedAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton 
-                          onClick={() => handleOpenRentDialog(rent)}
-                          color="primary"
-                          size="large"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          onClick={() => handleDeleteRent(rent.id)}
-                          color="error"
-                          size="large"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
-
-          <TabPanel value={activeTab} index={2}>
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Box>
-                <Typography variant="h6" fontWeight="600">Bills Management</Typography>
-                <Box sx={{ mt: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <FormControl sx={{ minWidth: 200 }}>
-                    <InputLabel>Select Tenant</InputLabel>
-                    <Select
-                      value={selectedUserId}
-                      label="Select Tenant"
-                      onChange={(e) => setSelectedUserId(e.target.value)}
-                      variant="outlined"
-                    >
-                      <MenuItem value="all">All Tenants</MenuItem>
-                      {users.map((user) => (
-                        <MenuItem key={user.id} value={user.id}>
-                          {user.firstName} {user.lastName}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Bills: Rs. {calculateBillsTotals(selectedUserId).totalBills.toLocaleString()} | 
-                    Paid: Rs. {calculateBillsTotals(selectedUserId).totalBillsPaid.toLocaleString()} | 
-                    Balance: Rs. {calculateBillsTotals(selectedUserId).totalBillsBalance.toLocaleString()}
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenBillDialog()}
-              >
-                Add Bill Entry
-              </Button>
-            </Box>
-            
-            <TableContainer>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Tenant</TableCell>
-                    <TableCell>Bill Type</TableCell>
-                    <TableCell>Period</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Paid</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Paid Date</TableCell>
-                    <TableCell>Balance</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(selectedUserId === 'all' ? monthlyBills : monthlyBills.filter(bill => bill.userId === selectedUserId)).map((bill) => (
-                    <TableRow key={bill.id} hover>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {bill.userName}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                            {getTransactionIcon(bill.type, bill.type)}
-                          </Avatar>
-                          <Typography variant="body1" fontWeight="500">
-                            {getTransactionTypeLabel(bill.type, bill.type)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {bill.month}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {bill.year}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>Rs. {bill.amount}</TableCell>
-                      <TableCell>Rs. {bill.paidAmount}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={bill.status} 
-                          color={getStatusColor(bill.status)}
-                          size="small"
-                          variant="filled"
-                        />
-                      </TableCell>
-                      <TableCell>{bill.paidDate || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body1" 
-                          fontWeight="500"
-                          color={calculateRemainingBalance(bill.amount, bill.paidAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton 
-                          onClick={() => handleOpenBillDialog(bill)}
-                          color="primary"
-                          size="large"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          onClick={() => handleDeleteBill(bill.id)}
-                          color="error"
-                          size="large"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            {(selectedUserId === 'all' ? monthlyBills : monthlyBills.filter(bill => bill.userId === selectedUserId)).length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-                <Typography variant="body1" color="text.secondary">
-                  No bills available for {selectedUserId === 'all' ? 'any tenants' : 'this tenant'}.
-                </Typography>
-              </Box>
-            )}
-          </TabPanel>
-
-          <TabPanel value={activeTab} index={3}>
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-              <Typography variant="h6" fontWeight="600">Consolidated Transactions</Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpenRentDialog()}
-                >
-                  Add Rent
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpenBillDialog()}
-                >
-                  Add Bill
-                </Button>
-              </Box>
-            </Box>
-            
-            <TableContainer>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Tenant</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Period</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Paid</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Paid Date</TableCell>
-                    <TableCell>Balance</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getConsolidatedTransactions().map((transaction) => (
-                    <TableRow key={transaction.id} hover>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {transaction.userName}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                            {getTransactionIcon(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
-                          </Avatar>
-                          <Typography variant="body1" fontWeight="500">
-                            {getTransactionTypeLabel(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body1" fontWeight="500">
-                          {transaction.month}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {transaction.year}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>Rs. {transaction.amount}</TableCell>
-                      <TableCell>Rs. {transaction.receivedAmount || transaction.paidAmount}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={transaction.status} 
-                          color={getStatusColor(transaction.status)}
-                          size="small"
-                          variant="filled"
-                        />
-                      </TableCell>
-                      <TableCell>{transaction.paidDate || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body1" 
-                          fontWeight="500"
-                          color={calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton 
-                          onClick={() => transaction.type === 'rent' ? handleOpenRentDialog(transaction) : handleOpenBillDialog(transaction)}
-                          color="primary"
-                          size="large"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          onClick={() => transaction.type === 'rent' ? handleDeleteRent(transaction.id) : handleDeleteBill(transaction.id)}
-                          color="error"
-                          size="large"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
+          </Box>
+          <Grid container spacing={3} sx={{ p: 2 }}>
+            {users.map((user) => (
+              <Grid item xs={12} md={6} lg={4} key={user.id}>
+                <UserCard
+                  user={user}
+                  monthlyRents={monthlyRents}
+                  monthlyBills={monthlyBills}
+                  handleOpenDialog={handleOpenDialog}
+                  handleDeleteUser={handleDeleteUser}
+                  handleOpenRentDialog={handleOpenRentDialog}
+                  handleOpenBillDialog={handleOpenBillDialog}
+                  handleDeleteRent={handleDeleteRent}
+                  handleDeleteBill={handleDeleteBill}
+                  theme={theme}
+                  months={months}
+                  years={years}
+                  getTransactionTypeLabel={getTransactionTypeLabel}
+                  getTransactionIcon={getTransactionIcon}
+                  calculateRemainingBalance={calculateRemainingBalance}
+                  getStatusColor={getStatusColor}
+                  currentUser={currentUser}
+                  updateRentEntry={updateRentEntry}
+                  updateBillEntry={updateBillEntry}
+                />
+              </Grid>
+            ))}
+          </Grid>
         </Paper>
 
-        <Dialog 
-          open={openDialog} 
-          onClose={handleCloseDialog} 
-          maxWidth="md" 
+        <Dialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          maxWidth="md"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
@@ -1616,14 +1264,11 @@ export default function AdminDashboard() {
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowPassword(!showPassword)}
-                              edge="end"
-                            >
+                            <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
                               {showPassword ? <VisibilityOff /> : <Visibility />}
                             </IconButton>
                           </InputAdornment>
-                        )
+                        ),
                       }}
                     />
                   </Grid>
@@ -1657,7 +1302,6 @@ export default function AdminDashboard() {
                     }}
                   />
                 </Grid>
-                
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -1714,28 +1358,31 @@ export default function AdminDashboard() {
             </Box>
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={handleCloseDialog} 
-              variant="outlined"
-              sx={{ borderRadius: 2 }}
-            >
+            <Button onClick={handleCloseDialog} variant="outlined" sx={{ borderRadius: 2 }}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleSubmit} 
+            <Button
+              onClick={handleSubmit}
               variant="contained"
               sx={{ borderRadius: 2 }}
-              disabled={!formData.firstName || !formData.lastName || !formData.email || (!editingUser && !formData.password) || !formData.rentStartDate || !formData.rentEndDate}
+              disabled={
+                !formData.firstName ||
+                !formData.lastName ||
+                !formData.email ||
+                (!editingUser && !formData.password) ||
+                !formData.rentStartDate ||
+                !formData.rentEndDate
+              }
             >
               {editingUser ? 'Update' : 'Add Tenant'}
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog 
-          open={openRentDialog} 
-          onClose={handleCloseRentDialog} 
-          maxWidth="md" 
+        <Dialog
+          open={openRentDialog}
+          onClose={handleCloseRentDialog}
+          maxWidth="md"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
@@ -1846,10 +1493,10 @@ export default function AdminDashboard() {
                       label="Status"
                       onChange={(e) => {
                         const newStatus = e.target.value;
-                        setRentFormData({ 
-                          ...rentFormData, 
+                        setRentFormData({
+                          ...rentFormData,
                           status: newStatus,
-                          receivedAmount: newStatus === 'paid' ? rentFormData.amount : rentFormData.receivedAmount
+                          receivedAmount: newStatus === 'paid' ? rentFormData.amount : rentFormData.receivedAmount,
                         });
                       }}
                       variant="outlined"
@@ -1889,27 +1536,19 @@ export default function AdminDashboard() {
             </Box>
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={handleCloseRentDialog} 
-              variant="outlined"
-              sx={{ borderRadius: 2 }}
-            >
+            <Button onClick={handleCloseRentDialog} variant="outlined" sx={{ borderRadius: 2 }}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleRentSubmit} 
-              variant="contained"
-              sx={{ borderRadius: 2 }}
-            >
+            <Button onClick={handleRentSubmit} variant="contained" sx={{ borderRadius: 2 }}>
               {editingRent ? 'Update' : 'Add'}
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog 
-          open={openBillDialog} 
-          onClose={handleCloseBillDialog} 
-          maxWidth="md" 
+        <Dialog
+          open={openBillDialog}
+          onClose={handleCloseBillDialog}
+          maxWidth="md"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
@@ -2014,56 +1653,9 @@ export default function AdminDashboard() {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Paid Amount"
-                    type="number"
-                    value={billFormData.paidAmount}
-                    onChange={(e) => setBillFormData({ ...billFormData, paidAmount: e.target.value })}
-                    margin="normal"
-                    variant="outlined"
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
-                    }}
-                    disabled={billFormData.status === 'paid'}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth margin="normal">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={billFormData.status}
-                      label="Status"
-                      onChange={(e) => {
-                        const newStatus = e.target.value;
-                        setBillFormData({ 
-                          ...billFormData, 
-                          status: newStatus,
-                          paidAmount: newStatus === 'paid' ? billFormData.amount : billFormData.paidAmount
-                        });
-                      }}
-                      variant="outlined"
-                    >
-                      <MenuItem value="pending">Pending</MenuItem>
-                      <MenuItem value="paid">Paid</MenuItem>
-                      <MenuItem value="overdue">Overdue</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Paid Date"
-                    type="date"
-                    value={billFormData.paidDate}
-                    onChange={(e) => setBillFormData({ ...billFormData, paidDate: e.target.value })}
-                    margin="normal"
-                    InputLabelProps={{ shrink: true }}
-                    variant="outlined"
-                    disabled={billFormData.status !== 'paid'}
-                  />
-                </Grid>
+                
+                
+              
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
@@ -2080,18 +1672,10 @@ export default function AdminDashboard() {
             </Box>
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={handleCloseBillDialog} 
-              variant="outlined"
-              sx={{ borderRadius: 2 }}
-            >
+            <Button onClick={handleCloseBillDialog} variant="outlined" sx={{ borderRadius: 2 }}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleBillSubmit} 
-              variant="contained"
-              sx={{ borderRadius: 2 }}
-            >
+            <Button onClick={handleBillSubmit} variant="contained" sx={{ borderRadius: 2 }}>
               {editingBill ? 'Update' : 'Add'}
             </Button>
           </DialogActions>
@@ -2106,11 +1690,7 @@ export default function AdminDashboard() {
               bottom: 16,
               right: 16,
             }}
-            onClick={() => {
-              if (activeTab === 0) handleOpenDialog();
-              else if (activeTab === 1 || activeTab === 3) handleOpenRentDialog();
-              else if (activeTab === 2) handleOpenBillDialog();
-            }}
+            onClick={() => handleOpenDialog()}
           >
             <AddIcon />
           </Fab>

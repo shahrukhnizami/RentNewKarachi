@@ -641,34 +641,7 @@ export default function UserDashboard() {
             </Zoom>
           </Grid>
           
-          <Grid item xs={12} sm={6} md={3}>
-            <Zoom in={true} style={{ transitionDelay: '400ms' }}>
-              <Tooltip title="Outstanding balance for rent only">
-                <Card 
-                  elevation={3}
-                  sx={{ 
-                    borderRadius: 3,
-                    background: `linear-gradient(135deg, ${calculateTotalRentBalance() > 0 ? theme.palette.warning.light : theme.palette.info.main} 0%, ${calculateTotalRentBalance() > 0 ? theme.palette.warning.main : theme.palette.info.main} 100%)`,
-                    color: 'white',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                    <PaymentIcon sx={{ fontSize: 80 }} />
-                  </Box>
-                  <CardContent>
-                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                      Rent Balance
-                    </Typography>
-                    <Typography variant="h5" fontWeight="600">
-                      Rs. {calculateTotalRentBalance().toLocaleString()}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Tooltip>
-            </Zoom>
-          </Grid>
+         
           
           <Grid item xs={12} sm={6} md={3}>
             <Zoom in={true} style={{ transitionDelay: '500ms' }}>
@@ -1085,7 +1058,7 @@ export default function UserDashboard() {
                         <TableCell>Amount</TableCell>
                         <TableCell>Received</TableCell>
                         <TableCell>Balance</TableCell>
-                        <TableCell>Status</TableCell>
+                        
                         <TableCell>Paid Date</TableCell>
                       </TableRow>
                     </TableHead>
@@ -1112,15 +1085,8 @@ export default function UserDashboard() {
                               Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount)}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={rent.status} 
-                              color={getStatusColor(rent.status)}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell>{rent.paidDate || 'N/A'}</TableCell>
+                          
+                          
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1153,7 +1119,6 @@ export default function UserDashboard() {
                         <TableCell>Month/Year</TableCell>
                         <TableCell>Amount</TableCell>
                         <TableCell>Balance</TableCell>
-                        <TableCell>Status</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1188,14 +1153,7 @@ export default function UserDashboard() {
                               Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount)}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={bill.status} 
-                              color={getStatusColor(bill.status)}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </TableCell>
+                     
                         </TableRow>
                       ))}
                     </TableBody>
