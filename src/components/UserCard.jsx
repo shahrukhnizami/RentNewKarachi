@@ -26,8 +26,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
+import { serverTimestamp } from 'firebase/firestore';
 
 function UserCard({
   user,
@@ -47,8 +48,8 @@ function UserCard({
   calculateRemainingBalance,
   getStatusColor,
   currentUser,
-  updateRentEntry, // New prop for updating rent
-  updateBillEntry // New prop for updating bill
+  updateRentEntry,
+  updateBillEntry,
 }) {
   const [selectedMonth, setSelectedMonth] = useState(months[new Date().getMonth()]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -57,9 +58,6 @@ function UserCard({
   const [receiveAmount, setReceiveAmount] = useState('');
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [entryType, setEntryType] = useState('');
-//   const [receiveTotalAmount , setReceiveTotalAmount] = useState('');
-
-  
 
   const userRents = monthlyRents.filter(
     (r) => r.userId === user.id && r.month === selectedMonth && r.year === selectedYear
@@ -76,6 +74,78 @@ function UserCard({
   const total = totalRent + totalBill;
   const received = receivedRent + paidBill;
   const monthBalance = total - received;
+  
+  const calculatePreviousBalance = () => {
+    const userTransactions = [
+      ...monthlyRents.filter((r) => r.userId === user.id).map((r) => ({
+        month: r.month,
+        year: Number(r.year),
+        type: 'rent',
+        amount: Number(r.amount) || 0,
+        receivedAmount: Number(r.receivedAmount) || 0,
+      })),
+      ...monthlyBills.filter((b) => b.userId === user.id).map((b) => ({
+        month: b.month,
+        year: Number(b.year),
+        type: 'bill',
+        amount: Number(b.amount) || 0,
+        paidAmount: Number(b.paidAmount) || 0,
+      })),
+    ];
+
+    if (userTransactions.length === 0) return 0;
+
+    // Group by month-year
+    const grouped = {};
+    userTransactions.forEach((t) => {
+      const key = `${t.month}-${t.year}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          month: t.month,
+          year: t.year,
+          totalRent: 0,
+          totalBills: 0,
+          totalReceivedRent: 0,
+          totalPaidBills: 0,
+        };
+      }
+      if (t.type === 'rent') {
+        grouped[key].totalRent += t.amount;
+        grouped[key].totalReceivedRent += t.receivedAmount || 0;
+      } else {
+        grouped[key].totalBills += t.amount;
+        grouped[key].totalPaidBills += t.paidAmount || 0;
+      }
+    });
+
+    // Sort ascending by year, then month index
+    const ordered = Object.values(grouped).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return months.indexOf(a.month) - months.indexOf(b.month);
+    });
+
+    // Build cumulative remaining balance by month
+    const cumulativeByKey = {};
+    let running = 0;
+    ordered.forEach((m) => {
+      const monthNet = m.totalRent + m.totalBills - (m.totalReceivedRent + m.totalPaidBills);
+      running += monthNet;
+      const key = `${m.month}-${m.year}`;
+      cumulativeByKey[key] = running;
+    });
+
+    // Determine previous month-year of the selected filters
+    const selectedMonthIndex = months.indexOf(selectedMonth);
+    const selectedYearNum = Number(selectedYear);
+    const prevMonth = selectedMonthIndex === 0 ? months[11] : months[selectedMonthIndex - 1];
+    const prevYear = selectedMonthIndex === 0 ? selectedYearNum - 1 : selectedYearNum;
+    const prevKey = `${prevMonth}-${prevYear}`;
+
+    return cumulativeByKey[prevKey] || 0;
+  };
+
+  const previousBalance = calculatePreviousBalance();
+  const currentBalance = previousBalance + monthBalance;
 
   const handleOpenReceiveDialog = (entry, type) => {
     setSelectedEntry(entry);
@@ -93,7 +163,6 @@ function UserCard({
 
   const handleAddReceivedAmount = async () => {
     if (!selectedEntry || !receiveAmount || isNaN(receiveAmount) || Number(receiveAmount) < 0) {
-      // Basic validation
       return;
     }
 
@@ -104,16 +173,19 @@ function UserCard({
         const updatedRent = {
           ...selectedEntry,
           receivedAmount: newReceivedAmount,
-          
-          paidDate: newReceivedAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate
+          status: newReceivedAmount >= Number(selectedEntry.amount) ? 'paid' : selectedEntry.status,
+          paidDate: newReceivedAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate,
+          updatedAt: serverTimestamp(),
         };
         await updateRentEntry(updatedRent);
       } else if (entryType === 'bill') {
         const newPaidAmount = (Number(selectedEntry.paidAmount) || 0) + amountToAdd;
         const updatedBill = {
           ...selectedEntry,
-         
-          paidDate: newPaidAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate
+          paidAmount: newPaidAmount,
+          status: newPaidAmount >= Number(selectedEntry.amount) ? 'paid' : selectedEntry.status,
+          paidDate: newPaidAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate,
+          updatedAt: serverTimestamp(),
         };
         await updateBillEntry(updatedBill);
       }
@@ -128,7 +200,10 @@ function UserCard({
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Box display="flex" alignItems="center">
-            <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+            <Avatar 
+              src={user.profilePicture?.url || user.profilePicture} 
+              sx={{ mr: 2, bgcolor: 'primary.main' }}
+            >
               {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
             </Avatar>
             <Box>
@@ -190,19 +265,23 @@ function UserCard({
         </Grid>
 
         <Box sx={{ mb: 2 }}>
-            
           <Typography variant="body1" fontWeight="500">
             Total: Rs. {total.toLocaleString()}
           </Typography>
+          
           <Typography variant="body1" color="success.main">
             Received/Paid: Rs. {received.toLocaleString()}
           </Typography>
+         
+          <Typography variant="body2" color="text.secondary">
+            Previous balance: Rs. {previousBalance.toLocaleString()}
+          </Typography>
           <Typography
             variant="body1"
-            color={monthBalance > 0 ? 'error.main' : 'success.main'}
+            color={currentBalance > 0 ? 'error.main' : 'success.main'}
             fontWeight="500"
           >
-            Balance: Rs. {monthBalance.toLocaleString()}
+            Balance: Rs. {currentBalance.toLocaleString()}
           </Typography>
         </Box>
 
@@ -222,10 +301,13 @@ function UserCard({
                 <Paper key={rent.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Box>
-                      <Typography>Amount: Rs. {rent.amount}</Typography>
-                      <Typography>Received: Rs. {rent.receivedAmount}</Typography>
-                     
-                      
+                      <Typography>Amount: Rs. {Number(rent.amount).toLocaleString()}</Typography>
+                      <Typography>Received: Rs. {Number(rent.receivedAmount || 0).toLocaleString()}</Typography>
+                      <Typography
+                        color={calculateRemainingBalance(rent.amount, rent.receivedAmount) > 0 ? 'error.main' : 'success.main'}
+                      >
+                        Balance: Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount).toLocaleString()}
+                      </Typography>
                     </Box>
                     <Box>
                       <IconButton onClick={() => handleOpenReceiveDialog(rent, 'rent')}>
@@ -278,9 +360,13 @@ function UserCard({
                   </Box>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Box>
-                      <Typography>Amount: Rs. {bill.amount}</Typography>
-                      
-                      
+                      <Typography>Amount: Rs. {Number(bill.amount).toLocaleString()}</Typography>
+                      <Typography>Paid: Rs. {Number(bill.paidAmount || 0).toLocaleString()}</Typography>
+                      <Typography
+                        color={calculateRemainingBalance(bill.amount, bill.paidAmount) > 0 ? 'error.main' : 'success.main'}
+                      >
+                        Balance: Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount).toLocaleString()}
+                      </Typography>
                     </Box>
                     <Box>
                       <IconButton onClick={() => handleOpenReceiveDialog(bill, 'bill')}>

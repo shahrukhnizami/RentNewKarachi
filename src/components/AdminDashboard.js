@@ -51,6 +51,8 @@ import {
   Build as MaintenanceIcon,
   Visibility,
   VisibilityOff,
+  PhotoCamera,
+  CloudUpload,
 } from '@mui/icons-material';
 import WindPowerIcon from '@mui/icons-material/WindPower';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,6 +70,8 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { uploadImageToCloudinary, deleteImageFromCloudinary, validateImageFile } from '../cloudinary/uploadUtils';
+// import { CloudinaryService } from '../cloudinary/services/cloudinaryService';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import UserCard from './UserCard';
@@ -91,6 +95,9 @@ export default function AdminDashboard() {
   const [editingRent, setEditingRent] = useState(null);
   const [editingBill, setEditingBill] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(
     [
       'January',
@@ -146,6 +153,119 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
+  // Add this inside your AdminDashboard component, after the state declarations
+  // Add these states after the existing ones
+  const [nicFrontImage, setNicFrontImage] = useState(null);
+  const [nicFrontPreview, setNicFrontPreview] = useState(null);
+  const [nicBackImage, setNicBackImage] = useState(null);
+  const [nicBackPreview, setNicBackPreview] = useState(null);
+  const [uploadingNic, setUploadingNic] = useState(false);
+  // NIC Upload Functions
+  const handleNicFrontSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      setNicFrontImage(file);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNicFrontPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleNicBackSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      setNicBackImage(file);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNicBackPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadNicImages = async (userId) => {
+    if (!nicFrontImage && !nicBackImage) return null;
+
+    try {
+      setUploadingNic(true);
+      setError('');
+
+      const nicDocuments = {};
+
+      // Upload NIC Front
+      if (nicFrontImage) {
+        console.log('📷 Uploading NIC Front...');
+        const frontResult = await uploadImageToCloudinary(nicFrontImage, 'nic-documents');
+
+        if (frontResult.success) {
+          nicDocuments.front = {
+            url: frontResult.url,
+            public_id: frontResult.public_id
+          };
+          console.log('✅ NIC Front uploaded successfully');
+        } else {
+          throw new Error(`NIC Front upload failed: ${frontResult.error}`);
+        }
+      }
+
+      // Upload NIC Back
+      if (nicBackImage) {
+        console.log('📷 Uploading NIC Back...');
+        const backResult = await uploadImageToCloudinary(nicBackImage, 'nic-documents');
+
+        if (backResult.success) {
+          nicDocuments.back = {
+            url: backResult.url,
+            public_id: backResult.public_id
+          };
+          console.log('✅ NIC Back uploaded successfully');
+        } else {
+          throw new Error(`NIC Back upload failed: ${backResult.error}`);
+        }
+      }
+
+      return nicDocuments;
+
+    } catch (error) {
+      console.error('❌ Error uploading NIC images:', error);
+      setError('Failed to upload NIC images: ' + error.message);
+      return null;
+    } finally {
+      setUploadingNic(false);
+    }
+  };
+
+  const deleteOldNicImages = async (nicDocuments) => {
+    if (!nicDocuments) return;
+
+    try {
+      if (nicDocuments.front && nicDocuments.front.public_id) {
+        await deleteImageFromCloudinary(nicDocuments.front.public_id);
+      }
+      if (nicDocuments.back && nicDocuments.back.public_id) {
+        await deleteImageFromCloudinary(nicDocuments.back.public_id);
+      }
+    } catch (error) {
+      console.error('Error deleting old NIC images:', error);
+      // Don't throw error as this is not critical
+    }
+  };
 
   const months = [
     'January',
@@ -282,6 +402,8 @@ export default function AdminDashboard() {
         balance: totalRemainingBalance,
       });
 
+
+
       setSuccess('Rent entry updated successfully');
       fetchMonthlyRents();
       fetchUsers();
@@ -290,6 +412,7 @@ export default function AdminDashboard() {
       setError('Failed to update rent entry');
     }
   };
+  //  console.log("previous",totalRemainingBalance);
 
   const updateBillEntry = async (bill) => {
     try {
@@ -344,6 +467,8 @@ export default function AdminDashboard() {
         rentStartDate: user.rentStartDate || '',
         rentEndDate: user.rentEndDate || '',
       });
+      // Set existing profile picture preview if available
+      setImagePreview(user.profilePicture?.url || null);
     } else {
       setEditingUser(null);
       setFormData({
@@ -358,7 +483,11 @@ export default function AdminDashboard() {
         rentStartDate: '',
         rentEndDate: '',
       });
+      // Clear image preview for new user
+      setImagePreview(null);
     }
+    // Reset image selection
+    setSelectedImage(null);
     setOpenDialog(true);
   };
 
@@ -481,7 +610,39 @@ export default function AdminDashboard() {
 
   const handleSubmit = async () => {
     try {
+      setError(''); // Clear previous errors
+
       if (editingUser) {
+        // Handle profile picture upload
+        let profilePictureData = editingUser.profilePicture;
+        if (selectedImage) {
+          if (editingUser.profilePicture && editingUser.profilePicture.public_id) {
+            await deleteOldProfilePicture(editingUser.profilePicture);
+          }
+          profilePictureData = await uploadProfilePicture(editingUser.id);
+          if (!profilePictureData && editingUser.profilePicture) {
+            profilePictureData = editingUser.profilePicture;
+          }
+        }
+
+        // Handle NIC images upload
+        let nicDocuments = editingUser.nicDocuments;
+        if (nicFrontImage || nicBackImage) {
+          // Delete old NIC images if they exist
+          if (editingUser.nicDocuments) {
+            await deleteOldNicImages(editingUser.nicDocuments);
+          }
+
+          // Upload new NIC images
+          const newNicDocuments = await uploadNicImages(editingUser.id);
+          if (newNicDocuments) {
+            nicDocuments = {
+              ...nicDocuments,
+              ...newNicDocuments
+            };
+          }
+        }
+
         await updateDoc(doc(db, 'users', editingUser.id), {
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -491,11 +652,26 @@ export default function AdminDashboard() {
           advanceDate: formData.advanceDate,
           rentStartDate: formData.rentStartDate,
           rentEndDate: formData.rentEndDate,
+          profilePicture: profilePictureData,
+          nicDocuments: nicDocuments,
           updatedAt: serverTimestamp(),
         });
         setSuccess('User updated successfully');
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+
+        // Upload profile picture
+        let profilePictureData = null;
+        if (selectedImage) {
+          profilePictureData = await uploadProfilePicture(userCredential.user.uid);
+        }
+
+        // Upload NIC images
+        let nicDocuments = null;
+        if (nicFrontImage || nicBackImage) {
+          nicDocuments = await uploadNicImages(userCredential.user.uid);
+        }
+
         const newUserData = {
           uid: userCredential.user.uid,
           firstName: formData.firstName,
@@ -507,6 +683,8 @@ export default function AdminDashboard() {
           advanceDate: formData.advanceDate,
           rentStartDate: formData.rentStartDate,
           rentEndDate: formData.rentEndDate,
+          profilePicture: profilePictureData,
+          nicDocuments: nicDocuments,
           balance: 0,
           createdAt: serverTimestamp(),
         };
@@ -514,11 +692,89 @@ export default function AdminDashboard() {
         await generateRentEntries(newUserData);
         setSuccess('User added successfully and rent entries generated');
       }
+
+      // Reset all image states
+      setSelectedImage(null);
+      setImagePreview(null);
+      setNicFrontImage(null);
+      setNicFrontPreview(null);
+      setNicBackImage(null);
+      setNicBackPreview(null);
+
       handleCloseDialog();
       fetchUsers();
     } catch (error) {
       console.error('Error saving user:', error);
       setError('Failed to save user: ' + error.message);
+    }
+  };
+
+  // Profile Picture Upload Functions
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Validate file using Cloudinary utility
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      setSelectedImage(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // In AdminDashboard.js - update the uploadProfilePicture function
+  const uploadProfilePicture = async (userId) => {
+    if (!selectedImage) return null;
+
+    try {
+      setUploadingImage(true);
+      setError(''); // Clear previous errors
+
+      console.log('Starting image upload for user:', userId);
+
+      // Upload to Cloudinary
+      const result = await uploadImageToCloudinary(selectedImage, 'profile-pictures');
+
+      if (result.success) {
+        console.log('Image upload successful:', result);
+        return {
+          url: result.url,
+          public_id: result.public_id
+        };
+      } else {
+        const errorMsg = `Failed to upload image: ${result.error}`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setError('Failed to upload image: ' + error.message);
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+  const deleteOldProfilePicture = async (imageData) => {
+    if (!imageData || !imageData.public_id) return;
+
+    try {
+      const result = await deleteImageFromCloudinary(imageData.public_id);
+      if (!result.success) {
+        console.warn('Failed to delete old image:', result.error);
+      }
+    } catch (error) {
+      console.error('Error deleting old image:', error);
+      // Don't throw error as this is not critical
     }
   };
 
@@ -1004,6 +1260,7 @@ export default function AdminDashboard() {
                         Rs. {user.totalReceived.toLocaleString()}
                       </Typography>
                     </TableCell>
+
                   </TableRow>
                 ))}
                 <TableRow>
@@ -1030,6 +1287,7 @@ export default function AdminDashboard() {
             </Box>
           )}
         </Paper>
+
 
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
@@ -1153,6 +1411,7 @@ export default function AdminDashboard() {
             </Box>
           </Box>
           <Grid container spacing={3} sx={{ p: 2 }}>
+
             {users.map((user) => (
               <Grid item xs={12} md={6} lg={4} key={user.id}>
                 <UserCard
@@ -1194,6 +1453,7 @@ export default function AdminDashboard() {
             </Typography>
           </DialogTitle>
           <DialogContent>
+
             {!editingUser && (
               <Alert severity="info" sx={{ mb: 2 }}>
                 This will create a new tenant account with email and password.
@@ -1235,6 +1495,150 @@ export default function AdminDashboard() {
                     required
                     disabled={!!editingUser}
                   />
+                </Grid>
+
+                {/* Profile Picture Upload */}
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 2, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Profile Picture
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      {/* Profile Picture Preview */}
+                      <Avatar
+                        src={imagePreview}
+                        sx={{
+                          width: 80,
+                          height: 80,
+                          border: '2px solid',
+                          borderColor: 'primary.main'
+                        }}
+                      >
+                        <PhotoCamera />
+                      </Avatar>
+
+                      {/* Upload Button */}
+                      <Box>
+                        <input
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          id="profile-picture-upload"
+                          type="file"
+                          onChange={handleImageSelect}
+                        />
+                        <label htmlFor="profile-picture-upload">
+                          <Button
+                            variant="outlined"
+                            component="span"
+                            startIcon={<CloudUpload />}
+                            disabled={uploadingImage}
+                            sx={{ mb: 1 }}
+                          >
+                            {uploadingImage ? 'Uploading...' : 'Upload Photo'}
+                          </Button>
+                        </label>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          Max size: 5MB. Supported formats: JPG, PNG, GIF
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Grid>
+
+
+                {/* NIC Documents Upload */}
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 2, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      NIC Documents (Front & Back)
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {/* NIC Front */}
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" gutterBottom>
+                          NIC Front Side
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar
+                            src={nicFrontPreview || (editingUser?.nicDocuments?.front?.url)}
+                            sx={{
+                              width: 120,
+                              height: 80,
+                              border: '2px solid',
+                              borderColor: 'primary.main'
+                            }}
+                            variant="rounded"
+                          >
+                            <PhotoCamera />
+                          </Avatar>
+                          <Box>
+                            <input
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              id="nic-front-upload"
+                              type="file"
+                              onChange={handleNicFrontSelect}
+                            />
+                            <label htmlFor="nic-front-upload">
+                              <Button
+                                variant="outlined"
+                                component="span"
+                                startIcon={<CloudUpload />}
+                                disabled={uploadingNic}
+                                size="small"
+                              >
+                                {uploadingNic ? 'Uploading...' : 'NIC Front'}
+                              </Button>
+                            </label>
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      {/* NIC Back */}
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="body2" gutterBottom>
+                          NIC Back Side
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar
+                            src={nicBackPreview || (editingUser?.nicDocuments?.back?.url)}
+                            sx={{
+                              width: 120,
+                              height: 80,
+                              border: '2px solid',
+                              borderColor: 'primary.main'
+                            }}
+                            variant="rounded"
+                          >
+                            <PhotoCamera />
+                          </Avatar>
+                          <Box>
+                            <input
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              id="nic-back-upload"
+                              type="file"
+                              onChange={handleNicBackSelect}
+                            />
+                            <label htmlFor="nic-back-upload">
+                              <Button
+                                variant="outlined"
+                                component="span"
+                                startIcon={<CloudUpload />}
+                                disabled={uploadingNic}
+                                size="small"
+                              >
+                                {uploadingNic ? 'Uploading...' : 'NIC Back'}
+                              </Button>
+                            </label>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                      Upload both sides of National Identity Card. Max size: 5MB each.
+                    </Typography>
+                  </Box>
                 </Grid>
                 {!editingUser && (
                   <Grid item xs={12}>
@@ -1471,7 +1875,7 @@ export default function AdminDashboard() {
                     disabled={rentFormData.status === 'paid'}
                   />
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -1618,9 +2022,9 @@ export default function AdminDashboard() {
                     }}
                   />
                 </Grid>
-                
-                
-              
+
+
+
                 <Grid item xs={12}>
                   <TextField
                     fullWidth

@@ -30,7 +30,18 @@ import {
   useMediaQuery,
   Fade,
   Zoom,
-  Tooltip
+  Tooltip,
+  Tabs,
+  Tab,
+  Divider,
+  CardHeader,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Badge,
+  alpha,
+  Popover
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -44,12 +55,18 @@ import {
   TrendingUp as TrendingUpIcon,
   Payment as PaymentIcon,
   History as HistoryIcon,
-  Info as InfoIcon,
+  // Info as InfoIcon,
   ElectricBolt as ElectricIcon,
   LocalGasStation as GasIcon,
   DirectionsCar as CarIcon,
-  Build as MaintenanceIcon
-  
+  Build as MaintenanceIcon,
+  Notifications as NotificationsIcon,
+  // Download as DownloadIcon,
+  // ContactSupport as SupportIcon,
+  CheckCircle as CheckCircleIcon,
+  Pending as PendingIcon,
+  Warning as WarningIcon,
+  AccountBalanceWallet as WalletIcon
 } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import { useAuth } from '../contexts/AuthContext';
@@ -66,6 +83,8 @@ export default function UserDashboard() {
   const [rentHistory, setRentHistory] = useState([]);
   const [billHistory, setBillHistory] = useState([]);
   const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [advanceAnchorEl, setAdvanceAnchorEl] = useState(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -75,11 +94,30 @@ export default function UserDashboard() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
   useEffect(() => {
     fetchUserData();
     fetchRentHistory();
     fetchBillHistory();
   }, [currentUser]);
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
+  const handleAdvanceClick = (event) => {
+    setAdvanceAnchorEl(event.currentTarget);
+  };
+
+  const handleAdvanceClose = () => {
+    setAdvanceAnchorEl(null);
+  };
+
+  const advanceOpen = Boolean(advanceAnchorEl);
 
   const handleLogout = async () => {
     try {
@@ -138,15 +176,10 @@ export default function UserDashboard() {
         ...doc.data()
       }));
       
-      // Sort the data in JavaScript
       rentsList.sort((a, b) => {
         if (b.year !== a.year) {
           return b.year - a.year;
         }
-        const months = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
-        ];
         return months.indexOf(b.month) - months.indexOf(a.month);
       });
       
@@ -173,15 +206,10 @@ export default function UserDashboard() {
         ...doc.data()
       }));
       
-      // Sort the data in JavaScript
       billsList.sort((a, b) => {
         if (b.year !== a.year) {
           return b.year - a.year;
         }
-        const months = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'
-        ];
         return months.indexOf(b.month) - months.indexOf(a.month);
       });
       
@@ -192,18 +220,10 @@ export default function UserDashboard() {
     }
   };
 
-  // Calculate monthly summary for rent and bills
   const calculateMonthlySummary = () => {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    // Combine rent and bill histories
     const combined = [...rentHistory, ...billHistory];
-    
-    // Group by month and year
     const summary = {};
+    
     combined.forEach((transaction) => {
       const key = `${transaction.month}-${transaction.year}`;
       if (!summary[key]) {
@@ -213,7 +233,11 @@ export default function UserDashboard() {
           totalRent: 0,
           totalBills: 0,
           totalReceivedRent: 0,
-          totalPaidBills: 0
+          totalPaidBills: 0,
+          previousBalance: 0,
+          totalAmountDue: 0,
+          totalPaid: 0,
+          remainingBalance: 0
         };
       }
       
@@ -225,26 +249,34 @@ export default function UserDashboard() {
         summary[key].totalPaidBills += Number(transaction.paidAmount) || 0;
       }
     });
-    
-    // Convert to array and sort
-    const summaryArray = Object.values(summary).sort((a, b) => {
+
+    const summaryArrayAsc = Object.values(summary).sort((a, b) => {
+      if (a.year !== b.year) {
+        return a.year - b.year;
+      }
+      return months.indexOf(a.month) - months.indexOf(b.month);
+    });
+
+    let runningPrevious = 0;
+    for (let i = 0; i < summaryArrayAsc.length; i++) {
+      const item = summaryArrayAsc[i];
+      item.previousBalance = runningPrevious;
+      item.totalAmountDue = item.previousBalance + item.totalRent + item.totalBills;
+      item.totalPaid = item.totalReceivedRent + item.totalPaidBills;
+      item.remainingBalance = item.totalAmountDue - item.totalPaid;
+      runningPrevious = item.remainingBalance;
+    }
+
+    return summaryArrayAsc.sort((a, b) => {
       if (b.year !== a.year) {
         return b.year - a.year;
       }
       return months.indexOf(b.month) - months.indexOf(a.month);
     });
-    
-    return summaryArray;
   };
 
-  // Combine and sort rent and bill histories
   const getConsolidatedTransactions = () => {
     const combined = [...rentHistory, ...billHistory];
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
     combined.sort((a, b) => {
       if (b.year !== a.year) {
         return b.year - a.year;
@@ -285,8 +317,6 @@ export default function UserDashboard() {
     });
   };
 
-
-
   const getTransactionIcon = (type, billType) => {
     if (type === 'rent') return <PaymentIcon />;
     switch (billType) {
@@ -309,43 +339,17 @@ export default function UserDashboard() {
     }
   };
 
-  const calculateRemainingBalance = (amount, receivedAmount) => {
-    return Math.max(0, amount - (receivedAmount || 0));
+  const getStatusChip = (remainingBalance) => {
+    if (remainingBalance === 0) {
+      return <Chip icon={<CheckCircleIcon />} label="Paid" color="success" size="small" />;
+    } else if (remainingBalance > 0) {
+      return <Chip icon={<WarningIcon />} label="Pending" color="warning" size="small" />;
+    }
+    return <Chip icon={<PendingIcon />} label="Processing" color="info" size="small" />;
   };
 
-  // Calculate total bills for the user
-  const calculateTotalBills = () => {
-    return billHistory.reduce((sum, bill) => sum + (bill.amount || 0), 0);
-  };
-
-  // Calculate total bills paid for the user
-  const calculateTotalBillsPaid = () => {
-    return billHistory.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
-  };
-
-  // Calculate total bills balance for the user
-  const calculateTotalBillsBalance = () => {
-    return calculateTotalBills() - calculateTotalBillsPaid();
-  };
-
-  // Calculate total rent balance for the user
-  // const calculateTotalRentBalance = () => {
-  //   return rentHistory.reduce((sum, rent) => sum + calculateRemainingBalance(rent.amount, rent.receivedAmount), 0);
-  // };
-
-  // Calculate total paid amount (rent + bills)
-  // const calculateTotalPaidAmount = () => {
-  //   const totalRentPaid = rentHistory.reduce((sum, rent) => sum + (rent.receivedAmount || 0), 0);
-  //   const totalBillsPaid = billHistory.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
-  //   return totalRentPaid + totalBillsPaid;
-  // };
-
-  // Calculate payment progress percentage
-  const calculatePaymentProgress = () => {
-    if (!userData || !userData.monthlyRent) return 0;
-    const paidAmount = userData.monthlyRent - (userData.balance || 0);
-    return (paidAmount / userData.monthlyRent) * 100;
-  };
+  const latestSummary = calculateMonthlySummary()[0] || {};
+  const totalBalance = latestSummary.remainingBalance || 0;
 
   if (loading) {
     return (
@@ -355,12 +359,15 @@ export default function UserDashboard() {
         alignItems="center" 
         minHeight="100vh"
         flexDirection="column"
+        sx={{
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+        }}
       >
-        <Avatar sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main' }}>
-          <PersonIcon fontSize="large" />
+        <Avatar sx={{ width: 80, height: 80, mb: 2, bgcolor: 'white', color: theme.palette.primary.main }}>
+          <AccountBalanceIcon fontSize="large" />
         </Avatar>
-        <Typography variant="h6" gutterBottom>Loading your dashboard...</Typography>
-        <LinearProgress sx={{ width: '50%', maxWidth: 300, mt: 2 }} />
+        <Typography variant="h6" gutterBottom color="white">Loading your dashboard...</Typography>
+        <LinearProgress sx={{ width: '50%', maxWidth: 300, mt: 2, bgcolor: 'rgba(255,255,255,0.3)' }} />
       </Box>
     );
   }
@@ -377,51 +384,120 @@ export default function UserDashboard() {
     <>
       <AppBar 
         position="sticky" 
-        elevation={2}
+        elevation={0}
         sx={{ 
-          background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+          background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.secondary.main} 90%)`,
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${alpha(theme.palette.background.paper, 0.1)}`
         }}
       >
         <Toolbar>
           <Box display="flex" alignItems="center" flexGrow={1}>
-            <AccountBalanceIcon sx={{ mr: 1 }} />
-            <Typography variant="h6" component="div">
+            <AccountBalanceIcon sx={{ mr: 1, fontSize: 32 }} />
+            <Typography variant="h5" component="div" fontWeight="700">
               RentEase
             </Typography>
           </Box>
           
-          <Box display="flex" alignItems="center">
-            <Avatar 
-              sx={{ 
-                width: 40, 
-                height: 40, 
-                mr: 1,
-                bgcolor: 'secondary.main',
-                fontSize: '1rem'
-              }}
-            >
-              {userData.firstName?.charAt(0)}{userData.lastName?.charAt(0)}
-            </Avatar>
-            
-            {!isMobile && (
-              <Typography variant="body2" sx={{ mr: 2 }}>
-                Hi, {userData.firstName}
-              </Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            {/* Advance Amount Display */}
+            {userData.advanceAmount && (
+              <>
+                {/* Desktop View */}
+                {!isMobile ? (
+                  <Tooltip title="Click to view advance details">
+                    <Button
+                      variant="outlined"
+                      startIcon={<WalletIcon />}
+                      onClick={handleAdvanceClick}
+                      sx={{
+                        borderColor: 'rgba(255,255,255,0.3)',
+                        color: 'white',
+                        '&:hover': {
+                          borderColor: 'rgba(255,255,255,0.5)',
+                          backgroundColor: 'rgba(255,255,255,0.1)'
+                        }
+                      }}
+                    >
+                      <Box sx={{ textAlign: 'left' }}>
+                        <Typography variant="caption" display="block" sx={{ opacity: 0.8, lineHeight: 1 }}>
+                          Advance
+                        </Typography>
+                        <Typography variant="body2" fontWeight="600">
+                          Rs. {userData.advanceAmount.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Button>
+                </Tooltip>
+                ) : (
+                  // Mobile View - Icon only
+                  <Tooltip title="Advance Amount">
+                    <IconButton 
+                      onClick={handleAdvanceClick}
+                      sx={{ 
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.3)'
+                      }}
+                    >
+                      <WalletIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </>
             )}
+
+            <Badge badgeContent={3} color="error">
+              <IconButton color="inherit" size="large">
+                <NotificationsIcon />
+              </IconButton>
+            </Badge>
             
             <IconButton 
               color="inherit" 
               onClick={refreshData}
-              sx={{ mr: 1 }}
               size="large"
+              sx={{ 
+                transition: 'transform 0.3s',
+                '&:hover': { transform: 'rotate(180deg)' }
+              }}
             >
               <RefreshIcon />
             </IconButton>
+            
+            <Box display="flex" alignItems="center" sx={{ ml: 1 }}>
+            {/* // In the navbar section, update the Avatar component: */}
+<Avatar 
+  src={userData.profilePicture?.url}
+  sx={{ 
+    width: 40, 
+    height: 40, 
+    mr: 1,
+    bgcolor: userData.profilePicture?.url ? 'transparent' : 'white',
+    color: theme.palette.primary.main,
+    fontWeight: 'bold',
+    border: `2px solid ${alpha(theme.palette.common.white, 0.3)}`
+  }}
+>
+  {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
+</Avatar>
+              
+              {!isMobile && (
+                <Box>
+                  <Typography variant="body2" fontWeight="600">
+                    Hi, {userData.firstName}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {userData.role}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
             
             <IconButton 
               color="inherit" 
               onClick={handleLogout}
               size="large"
+              sx={{ ml: 1 }}
             >
               <LogoutIcon />
             </IconButton>
@@ -429,816 +505,753 @@ export default function UserDashboard() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        {error && (
-          <Fade in={!!error}>
-            <Alert 
-              severity="error" 
-              sx={{ mb: 2 }} 
-              onClose={() => setError('')}
-            >
-              {error}
-            </Alert>
-          </Fade>
+      {/* Advance Details Popover */}
+      <Popover
+        open={advanceOpen}
+        anchorEl={advanceAnchorEl}
+        onClose={handleAdvanceClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+            minWidth: 250,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.95)} 0%, ${alpha(theme.palette.info.dark, 0.95)} 100%)`,
+            color: 'white',
+            backdropFilter: 'blur(20px)'
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <WalletIcon sx={{ mr: 1 }} />
+          <Typography variant="h6" fontWeight="600">Advance Details</Typography>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>Advance Amount</Typography>
+          <Typography variant="h5" fontWeight="700">
+            Rs. {userData.advanceAmount?.toLocaleString() || 0}
+          </Typography>
+        </Box>
+        
+        {userData.advanceDate && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ opacity: 0.8 }}>Advance Date</Typography>
+            <Typography variant="body1" fontWeight="600">
+              {userData.advanceDate}
+            </Typography>
+          </Box>
         )}
         
-        {success && (
-          <Fade in={!!success}>
-            <Alert 
-              severity="success" 
-              sx={{ mb: 2 }} 
-              onClose={() => setSuccess('')}
-            >
-              {success}
-            </Alert>
-          </Fade>
-        )}
-
-        {/* Welcome Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight="600" gutterBottom>
-            Welcome back, {userData.firstName}!
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Here's your rental overview and payment history.
-          </Typography>
+        <Box>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>Status</Typography>
+          <Chip 
+            label="Paid" 
+            color="success" 
+            size="small"
+            sx={{ color: 'white', fontWeight: '600' }}
+          />
         </Box>
+      </Popover>
 
-        {/* Monthly Summary Cards */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" fontWeight="600" gutterBottom>
-            Monthly Payment Summary
-          </Typography>
-          
-          {calculateMonthlySummary().length > 0 ? (
-            <Grid container spacing={3}>
-              {calculateMonthlySummary().map((summary, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Zoom in={true} style={{ transitionDelay: `${100 * (index % 3)}ms` }}>
-                    <Card
-                      elevation={3}
-                      sx={{
-                        borderRadius: 3,
-                        background: `linear-gradient(135deg, ${theme.palette.info.light} 0%, ${theme.palette.info.main} 100%)`,
-                        color: 'white',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                        <CalendarIcon sx={{ fontSize: 80 }} />
-                      </Box>
-                      <CardContent>
-                        <Typography variant="h6" fontWeight="600" gutterBottom>
-                          {summary.month} {summary.year}
-                        </Typography>
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Total Rent: Rs. {summary.totalRent.toLocaleString()}
-                          </Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Total Bills: Rs. {summary.totalBills.toLocaleString()}
-                          </Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                            Total Amount: Rs. {(summary.totalRent + summary.totalBills).toLocaleString()}
-                          </Typography>
-                          <Typography variant="body2" color="black">
-                            Total Paid: Rs. {(summary.totalReceivedRent + summary.totalPaidBills).toLocaleString()}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            fontWeight="600"
-                            color={(summary.totalRent + summary.totalBills - summary.totalReceivedRent - summary.totalPaidBills) > 0 ? 'error.main' : 'success.main'}
-                          >
-                            Balance: Rs. {(summary.totalRent + summary.totalBills - summary.totalReceivedRent - summary.totalPaidBills).toLocaleString()}
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Zoom>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary">
-                No monthly payment data available yet.
-              </Typography>
-            </Box>
+      <Box
+        sx={{
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+          minHeight: '100vh',
+          py: 4
+        }}
+      >
+        <Container maxWidth="xl">
+          {error && (
+            <Fade in={!!error}>
+              <Alert 
+                severity="error" 
+                sx={{ mb: 3, borderRadius: 3 }} 
+                onClose={() => setError('')}
+              >
+                {error}
+              </Alert>
+            </Fade>
           )}
-        </Box>
+          
+          {success && (
+            <Fade in={!!success}>
+              <Alert 
+                severity="success" 
+                sx={{ mb: 3, borderRadius: 3 }} 
+                onClose={() => setSuccess('')}
+              >
+                {success}
+              </Alert>
+            </Fade>
+          )}
 
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Zoom in={true} style={{ transitionDelay: '100ms' }}>
-              <Card 
-                elevation={3}
-                sx={{ 
+          {/* Header Section */}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography variant="h3" fontWeight="700" gutterBottom sx={{ 
+                  background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  color: 'transparent'
+                }}>
+                  Welcome back, {userData.firstName}!
+                </Typography>
+                <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
+                  Here's your complete rental overview and payment dashboard
+                </Typography>
+              </Box>
+              
+              <Button
+                variant="contained"
+                startIcon={<EditIcon />}
+                onClick={handleOpenEditDialog}
+                sx={{
                   borderRadius: 3,
-                  background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                  color: 'white',
-                  position: 'relative',
-                  overflow: 'hidden'
+                  px: 3,
+                  py: 1,
+                  background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                  boxShadow: `0 8px 25px ${alpha(theme.palette.primary.main, 0.3)}`
                 }}
               >
-                <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                  <PersonIcon sx={{ fontSize: 80 }} />
-                </Box>
-                <CardContent>
-                  <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                    Tenant
-                  </Typography>
-                  <Typography variant="h5" fontWeight="600">
-                    {userData.firstName} {userData.lastName}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Zoom>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Zoom in={true} style={{ transitionDelay: '200ms' }}>
-              <Card 
-                elevation={3}
-                sx={{ 
-                  borderRadius: 3,
-                  background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-                  color: 'white',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                  <MoneyIcon sx={{ fontSize: 80 }} />
-                </Box>
-                <CardContent>
-                  <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                    Monthly Rent
-                  </Typography>
-                  <Typography variant="h5" fontWeight="600">
-                    Rs. {userData.monthlyRent || 0}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Zoom>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Zoom in={true} style={{ transitionDelay: '300ms' }}>
-              <Tooltip title="Total outstanding balance including rent and bills">
+                Edit Profile
+              </Button>
+            </Box>
+
+            {/* Removed the duplicate advance amount card since it's now in navbar */}
+          </Box>
+
+          {/* Rest of the dashboard content remains the same */}
+          {/* Key Metrics Cards */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Zoom in={true} style={{ transitionDelay: '100ms' }}>
                 <Card 
-                  elevation={3}
+                  elevation={4}
                   sx={{ 
                     borderRadius: 3,
-                    background: `linear-gradient(135deg, ${userData.balance > 0 ? theme.palette.error.light : theme.palette.info.main} 0%, ${userData.balance > 0 ? theme.palette.error.main : theme.palette.info.main} 100%)`,
+                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                     color: 'white',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transition: 'transform 0.3s, box-shadow 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: `0 16px 40px ${alpha(theme.palette.primary.main, 0.4)}`
+                    }
                   }}
                 >
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                    <BalanceIcon sx={{ fontSize: 80 }} />
+                  <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
+                    <PersonIcon sx={{ fontSize: 120 }} />
                   </Box>
-                  <CardContent>
-                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                      Total Balance
+                  <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                      Tenant
                     </Typography>
-                    <Typography variant="h5" fontWeight="600">
-                      Rs. {userData.balance || 0}
+                    <Typography variant="h4" fontWeight="700">
+                      {userData.firstName} {userData.lastName}
                     </Typography>
                   </CardContent>
                 </Card>
-              </Tooltip>
-            </Zoom>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Zoom in={true} style={{ transitionDelay: '400ms' }}>
-              <Tooltip title="Outstanding balance for bills only">
+              </Zoom>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Zoom in={true} style={{ transitionDelay: '200ms' }}>
                 <Card 
-                  elevation={3}
+                  elevation={4}
                   sx={{ 
                     borderRadius: 3,
-                    background: `linear-gradient(135deg, ${calculateTotalBillsBalance() > 0 ? theme.palette.warning.light : theme.palette.info.main} 0%, ${calculateTotalBillsBalance() > 0 ? theme.palette.warning.main : theme.palette.info.main} 100%)`,
+                    background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
                     color: 'white',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transition: 'transform 0.3s, box-shadow 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: `0 16px 40px ${alpha(theme.palette.success.main, 0.4)}`
+                    }
                   }}
                 >
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
-                    <ReceiptIcon sx={{ fontSize: 80 }} />
+                  <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
+                    <MoneyIcon sx={{ fontSize: 120 }} />
                   </Box>
-                  <CardContent>
-                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
-                      Bills Balance
+                  <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                      Monthly Rent
                     </Typography>
-                    <Typography variant="h5" fontWeight="600">
-                      Rs. {calculateTotalBillsBalance().toLocaleString()}
+                    <Typography variant="h4" fontWeight="700">
+                      Rs. {rentHistory.length > 0 ? rentHistory[0].amount?.toLocaleString() || 0 : 0}
                     </Typography>
                   </CardContent>
                 </Card>
-              </Tooltip>
-            </Zoom>
+              </Zoom>
+            </Grid>
+            
+            
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Zoom in={true} style={{ transitionDelay: '400ms' }}>
+                <Tooltip title="Total bill amount for latest month">
+                  <Card 
+                    elevation={4}
+                    sx={{ 
+                      borderRadius: 3,
+                      background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': {
+                        transform: 'translateY(-8px)',
+                        boxShadow: `0 16px 40px ${alpha(theme.palette.warning.main, 0.4)}`
+                      }
+                    }}
+                  >
+                    <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
+                      <ReceiptIcon sx={{ fontSize: 120 }} />
+                    </Box>
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                        Total Bills
+                      </Typography>
+                      <Typography variant="h4" fontWeight="700">
+                        Rs. {latestSummary.totalBills?.toLocaleString() || 0}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Tooltip>
+              </Zoom>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Zoom in={true} style={{ transitionDelay: '300ms' }}>
+                <Tooltip title="Total outstanding balance including rent and bills">
+                  <Card 
+                    elevation={4}
+                    sx={{ 
+                      borderRadius: 3,
+                      background: `linear-gradient(135deg, ${totalBalance > 0 ? theme.palette.error.main : theme.palette.info.main} 0%, ${totalBalance > 0 ? theme.palette.error.dark : theme.palette.info.dark} 100%)`,
+                      color: 'white',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': {
+                        transform: 'translateY(-8px)',
+                        boxShadow: `0 16px 40px ${alpha(totalBalance > 0 ? theme.palette.error.main : theme.palette.info.main, 0.4)}`
+                      }
+                    }}
+                  >
+                    <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
+                      <BalanceIcon sx={{ fontSize: 120 }} />
+                    </Box>
+                    <CardContent sx={{ position: 'relative', zIndex: 1 }}>
+                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                        Total Balance
+                      </Typography>
+                      <Typography variant="h4" fontWeight="700">
+                        Rs. {totalBalance.toLocaleString()}
+                      </Typography>
+                     
+                    </CardContent>
+                  </Card>
+                </Tooltip>
+              </Zoom>
+            </Grid>
           </Grid>
-        </Grid>
 
-        {/* Monthly Payment Progress */}
-        <Paper 
-          elevation={2} 
+          {/* Main Content Area */}
+          <Grid container spacing={3}>
+            {/* Left Side - Profile and Quick Actions */}
+            <Grid item xs={12} lg={4}>
+              <Grid container spacing={3}>
+                {/* Profile Card */}
+                {/* In your UserDashboard.js, update the Profile Card section: */}
+
+{/* Profile Card */}
+<Grid item xs={12}>
+  <Card 
+    elevation={4}
+    sx={{ 
+      borderRadius: 3,
+      background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
+      backdropFilter: 'blur(10px)'
+    }}
+  >
+    <CardHeader
+      avatar={
+        <Avatar 
+          src={userData.profilePicture?.url}
           sx={{ 
-            p: 3, 
-            mb: 4, 
-            borderRadius: 3,
-            background: `linear-gradient(to right, ${theme.palette.background.paper}, ${theme.palette.grey[50]})`
+            width: 60, 
+            height: 60,
+            bgcolor: userData.profilePicture?.url ? 'transparent' : theme.palette.primary.main,
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            border: `2px solid ${theme.palette.primary.main}`
           }}
         >
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" fontWeight="600">
-              Monthly Payment Progress
-            </Typography>
-            <Chip 
-              label={`${calculatePaymentProgress().toFixed(0)}% Complete`} 
-              color={calculatePaymentProgress() === 100 ? 'success' : 'primary'}
-              variant="outlined"
-            />
-          </Box>
-          
-          <LinearProgress 
-            variant="determinate" 
-            value={calculatePaymentProgress()} 
-            sx={{ 
-              height: 10, 
-              borderRadius: 5,
-              mb: 2,
-              backgroundColor: theme.palette.grey[300],
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 5,
-                backgroundColor: calculatePaymentProgress() === 100 ? theme.palette.success.main : theme.palette.primary.main
-              }
-            }} 
+          {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
+        </Avatar>
+      }
+      title={
+        <Typography variant="h6" fontWeight="600">
+          {userData.firstName} {userData.lastName}
+        </Typography>
+      }
+      subheader={userData.email}
+    />
+    <CardContent>
+      <List dense>
+        <ListItem>
+          <ListItemIcon>
+            <PersonIcon color="primary" />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Role" 
+            secondary={
+              <Chip 
+                label={userData.role} 
+                color={userData.role === 'admin' ? 'primary' : 'default'}
+                size="small"
+              />
+            } 
           />
-          
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Paid: Rs. {userData.monthlyRent - (userData.balance || 0)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Total: Rs. {userData.monthlyRent}
-            </Typography>
-          </Box>
-        </Paper>
+        </ListItem>
+        <ListItem>
+          <ListItemIcon>
+            <CalendarIcon color="primary" />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Member Since" 
+            secondary={userData.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'} 
+          />
+        </ListItem>
+        {userData.advanceAmount && (
+          <ListItem>
+            <ListItemIcon>
+              <WalletIcon color="primary" />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Advance Amount" 
+              secondary={`Rs. ${userData.advanceAmount.toLocaleString()}`} 
+            />
+          </ListItem>
+        )}
+      </List>
 
-        {/* Profile Section */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6" fontWeight="600">Personal Information</Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  onClick={handleOpenEditDialog}
-                  size="small"
-                >
-                  Edit
-                </Button>
-              </Box>
-              
-              <Box display="flex" alignItems="center" mb={3}>
-                <Avatar 
+      {/* NIC Documents Section */}
+      {(userData.nicDocuments?.front || userData.nicDocuments?.back) && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+            NIC Documents
+          </Typography>
+          <Grid container spacing={2}>
+            {userData.nicDocuments?.front && (
+              <Grid item xs={6}>
+                <Box 
                   sx={{ 
-                    width: 80, 
-                    height: 80, 
-                    mr: 3,
-                    bgcolor: 'primary.main',
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold'
+                    textAlign: 'center',
+                    p: 1,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
                   }}
                 >
-                  {userData.firstName?.charAt(0)}{userData.lastName?.charAt(0)}
-                </Avatar>
-                
-                <Box>
-                  <Typography variant="h6" fontWeight="600">
-                    {userData.firstName} {userData.lastName}
+                  <Typography variant="caption" display="block" gutterBottom>
+                    NIC Front
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {userData.email}
-                  </Typography>
-                  <Chip 
-                    label={userData.role} 
-                    color={userData.role === 'admin' ? 'primary' : 'default'}
-                    size="small"
-                    sx={{ mt: 1 }}
+                  <Box
+                    component="img"
+                    src={userData.nicDocuments.front.url}
+                    alt="NIC Front"
+                    sx={{
+                      width: '100%',
+                      maxWidth: 120,
+                      height: 80,
+                      objectFit: 'cover',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        transition: 'transform 0.3s'
+                      }
+                    }}
+                    onClick={() => window.open(userData.nicDocuments.front.url, '_blank')}
                   />
                 </Box>
-              </Box>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>First Name</Typography>
-                    <Typography variant="body1">{userData.firstName}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>Last Name</Typography>
-                    <Typography variant="body1">{userData.lastName}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>Email</Typography>
-                    <Typography variant="body1">{userData.email}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>Member Since</Typography>
-                    <Typography variant="body1">
-                      {userData.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'}
-                    </Typography>
-                  </Box>
-                </Grid>
               </Grid>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <ReceiptIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight="600">Rent Information</Typography>
-              </Box>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ mb: 3, p: 2, backgroundColor: 'primary.light', borderRadius: 2 }}>
-                    <Typography variant="body2" color="primary.contrastText" gutterBottom>Monthly Rent</Typography>
-                    <Typography variant="h6" color="primary.contrastText" fontWeight="600">
-                      Rs. {userData.monthlyRent || 0}
-                    </Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ 
-                    mb: 3, 
-                    p: 2, 
-                    backgroundColor: userData.balance > 0 ? 'error.light' : 'success.light', 
-                    borderRadius: 2 
-                  }}>
-                    <Typography variant="body2" color={userData.balance > 0 ? 'error.contrastText' : 'success.contrastText'} gutterBottom>
-                      Total Balance
-                    </Typography>
-                    <Typography 
-                      variant="h6" 
-                      color={userData.balance > 0 ? 'error.contrastText' : 'success.contrastText'} 
-                      fontWeight="600"
-                    >
-                      Rs. {userData.balance || 0}
-                    </Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ mb: 2, p: 2, backgroundColor: 'info.light', borderRadius: 2 }}>
-                    <Typography variant="body2" color="info.contrastText" gutterBottom>Advance Amount</Typography>
-                    <Typography variant="h6" color="info.contrastText" fontWeight="600">
-                      Rs. {userData.advanceAmount || 0}
-                    </Typography>
-                  </Box>
-                </Grid>
-                
-                {userData.advanceDate && (
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>Advance Date</Typography>
-                      <Typography variant="body1">{userData.advanceDate}</Typography>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-              
-              {userData.balance > 0 && (
-                <Alert 
-                  severity="warning" 
-                  icon={<InfoIcon />}
-                  sx={{ mt: 2 }}
-                >
-                  You have an outstanding balance. Please contact the admin for payment arrangements.
-                </Alert>
-              )}
-            </Paper>
-          </Grid>
-        </Grid>
-
-        {/* Payment Summary */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} lg={8}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Payment Summary
-              </Typography>
-              
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={4}>
-                  <Box sx={{ textAlign: 'center', p: 2, border: `2px solid ${theme.palette.primary.main}`, borderRadius: 2 }}>
-                    <Typography variant="h6" color="primary">Monthly Rent</Typography>
-                    <Typography variant="h4" color="primary" fontWeight="700">Rs. {userData.monthlyRent || 0}</Typography>
-                    <Typography variant="body2" color="text.secondary">Per Month</Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={4}>
-                  <Box sx={{ textAlign: 'center', p: 2, border: `2px solid ${theme.palette.info.main}`, borderRadius: 2 }}>
-                    <Typography variant="h6" color="info.main">Advance Paid</Typography>
-                    <Typography variant="h4" color="info.main" fontWeight="700">Rs. {userData.advanceAmount || 0}</Typography>
-                    <Typography variant="body2" color="text.secondary">Advance Amount</Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={4}>
-                  <Box sx={{ 
-                    textAlign: 'center', 
-                    p: 2, 
-                    border: `2px solid ${userData.balance > 0 ? theme.palette.error.main : theme.palette.success.main}`, 
+            )}
+            {userData.nicDocuments?.back && (
+              <Grid item xs={6}>
+                <Box 
+                  sx={{ 
+                    textAlign: 'center',
+                    p: 1,
+                    border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
-                    backgroundColor: userData.balance > 0 ? 'error.light' : 'success.light'
-                  }}>
-                    <Typography variant="h6" color={userData.balance > 0 ? 'error.main' : 'success.main'}>
-                      Total Balance
-                    </Typography>
-                    <Typography variant="h4" color={userData.balance > 0 ? 'error.main' : 'success.main'} fontWeight="700">
-                      Rs. {userData.balance || 0}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {userData.balance > 0 ? 'Outstanding' : 'All Paid'}
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-              
-              {(userData.rentStartDate || userData.rentEndDate) && (
-                <Box sx={{ mt: 4 }}>
-                  <Typography variant="h6" fontWeight="600" gutterBottom>
-                    Rent Period
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                  }}
+                >
+                  <Typography variant="caption" display="block" gutterBottom>
+                    NIC Back
                   </Typography>
-                  
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        p: 2, 
-                        backgroundColor: 'grey.50', 
-                        borderRadius: 2 
-                      }}>
-                        <CalendarIcon color="primary" sx={{ mr: 2 }} />
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Rent Start Date</Typography>
-                          <Typography variant="body1" fontWeight="500">
-                            {userData.rentStartDate || 'Not set'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        p: 2, 
-                        backgroundColor: 'grey.50', 
-                        borderRadius: 2 
-                      }}>
-                        <CalendarIcon color="primary" sx={{ mr: 2 }} />
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Rent End Date</Typography>
-                          <Typography variant="body1" fontWeight="500">
-                            {userData.rentEndDate || 'Not set'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Grid>
-                  </Grid>
+                  <Box
+                    component="img"
+                    src={userData.nicDocuments.back.url}
+                    alt="NIC Back"
+                    sx={{
+                      width: '100%',
+                      maxWidth: 120,
+                      height: 80,
+                      objectFit: 'cover',
+                      borderRadius: 1,
+                      cursor: 'pointer',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        transition: 'transform 0.3s'
+                      }
+                    }}
+                    onClick={() => window.open(userData.nicDocuments.back.url, '_blank')}
+                  />
                 </Box>
-              )}
-            </Paper>
+              </Grid>
+            )}
           </Grid>
-          
-          <Grid item xs={12} lg={4}>
-            <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Quick Actions
-              </Typography>
-              
-              <Box sx={{ mt: 3 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  sx={{ mb: 2, py: 1.5, borderRadius: 2 }}
-                  startIcon={<PaymentIcon />}
-                >
-                  Make a Payment
-                </Button>
-                
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  size="large"
-                  sx={{ mb: 2, py: 1.5, borderRadius: 2 }}
-                  startIcon={<ReceiptIcon />}
-                >
-                  Download Invoice
-                </Button>
-                
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  size="large"
-                  sx={{ py: 1.5, borderRadius: 2 }}
-                  startIcon={<InfoIcon />}
-                >
-                  Contact Support
-                </Button>
-              </Box>
-              
-              {userData.balance > 0 && (
-                <Alert 
-                  severity="warning" 
-                  sx={{ mt: 3 }}
-                  action={
-                    <Button color="inherit" size="small">
-                      Pay Now
-                    </Button>
-                  }
-                >
-                  You have an outstanding balance of Rs. {userData.balance}
-                </Alert>
-              )}
-            </Paper>
+        </Box>
+      )}
+    </CardContent>
+  </Card>
+</Grid>
+
+                {/* Quick Actions */}
+                {/* <Grid item xs={12}>
+                  <Card 
+                    elevation={4}
+                    sx={{ 
+                      borderRadius: 3,
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <CardHeader
+                      title={
+                        <Typography variant="h6" fontWeight="600">
+                          Quick Actions
+                        </Typography>
+                      }
+                    />
+                    <CardContent>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          size="large"
+                          startIcon={<PaymentIcon />}
+                          sx={{
+                            py: 1.5,
+                            borderRadius: 2,
+                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            boxShadow: `0 4px 15px ${alpha(theme.palette.primary.main, 0.3)}`
+                          }}
+                        >
+                          Make Payment
+                        </Button>
+                        
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="large"
+                          startIcon={<DownloadIcon />}
+                          sx={{ py: 1.5, borderRadius: 2 }}
+                        >
+                          Download Invoice
+                        </Button>
+                        
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="large"
+                          startIcon={<SupportIcon />}
+                          sx={{ py: 1.5, borderRadius: 2 }}
+                        >
+                          Contact Support
+                        </Button>
+                      </Box>
+
+                      {totalBalance > 0 && (
+                        <Alert 
+                          severity="warning" 
+                          sx={{ 
+                            mt: 2,
+                            borderRadius: 2,
+                            background: alpha(theme.palette.warning.main, 0.1)
+                          }}
+                          action={
+                            <Button color="warning" size="small" variant="contained">
+                              Pay Now
+                            </Button>
+                          }
+                        >
+                          <Typography variant="body2" fontWeight="600">
+                            Outstanding Balance: Rs. {totalBalance.toLocaleString()}
+                          </Typography>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid> */}
+              </Grid>
+            </Grid>
+
+            {/* Right Side - Tabs Content */}
+            <Grid item xs={12} lg={8}>
+              <Card 
+                elevation={4}
+                sx={{ 
+                  borderRadius: 3,
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
+                  backdropFilter: 'blur(10px)'
+                }}
+              >
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs value={activeTab} onChange={handleTabChange} variant="scrollable">
+                    <Tab label="Monthly Summary" icon={<TrendingUpIcon />} iconPosition="start" />
+                    <Tab label="Payment History" icon={<HistoryIcon />} iconPosition="start" />
+                    <Tab label="All Transactions" icon={<ReceiptIcon />} iconPosition="start" />
+                  </Tabs>
+                </Box>
+
+                <CardContent>
+                  {activeTab === 0 && (
+                    <Box>
+                      <Typography variant="h6" fontWeight="600" gutterBottom>
+                        Current Month Overview
+                      </Typography>
+                      {calculateMonthlySummary().length > 0 ? (
+                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                          {calculateMonthlySummary().slice(0, 1).map((summary, index) => (
+                            <Grid item xs={12} key={index}>
+                              <Paper 
+                                elevation={2}
+                                sx={{ 
+                                  p: 3, 
+                                  borderRadius: 2,
+                                  background: `linear-gradient(135deg, ${theme.palette.info.light} 0%, ${theme.palette.info.main} 100%)`,
+                                  color: 'white'
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                  <Typography variant="h6" fontWeight="600">
+                                    {summary.month} {summary.year}
+                                  </Typography>
+                                  {getStatusChip(summary.remainingBalance)}
+                                </Box>
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12} sm={6} md={3}>
+                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Previous Balance</Typography>
+                                    <Typography variant="h6" fontWeight="600">Rs. {summary.previousBalance.toLocaleString()}</Typography>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6} md={3}>
+                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Total Rent</Typography>
+                                    <Typography variant="h6" fontWeight="600">Rs. {summary.totalRent.toLocaleString()}</Typography>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6} md={3}>
+                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Total Bills</Typography>
+                                    <Typography variant="h6" fontWeight="600">Rs. {summary.totalBills.toLocaleString()}</Typography>
+                                  </Grid>
+                                  <Grid item xs={12} sm={6} md={3}>
+                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>Total Paid</Typography>
+                                    <Typography variant="h6" fontWeight="600" color="success.light">Rs. {summary.totalPaid.toLocaleString()}</Typography>
+                                  </Grid>
+                                </Grid>
+                                <Divider sx={{ my: 2, opacity: 0.3 }} />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="body2" sx={{ opacity: 0.9 }}>Remaining Balance</Typography>
+                                  <Typography 
+                                    variant="h5" 
+                                    fontWeight="700"
+                                    color={summary.remainingBalance > 0 ? 'error.light' : 'success.light'}
+                                  >
+                                    Rs. {summary.remainingBalance.toLocaleString()}
+                                  </Typography>
+                                </Box>
+                              </Paper>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      ) : (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                          <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                          <Typography variant="body1" color="text.secondary">
+                            No monthly payment data available yet.
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                  {activeTab === 1 && (
+                    <Box>
+                      <Typography variant="h6" fontWeight="600" gutterBottom>
+                        Recent Transactions
+                      </Typography>
+                      {getConsolidatedTransactions().length > 0 ? (
+                        <TableContainer>
+                          <Table>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Type</TableCell>
+                                <TableCell>Date</TableCell>
+                                <TableCell align="right">Amount</TableCell>
+                                <TableCell align="right">Status</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {getConsolidatedTransactions().slice(0, 5).map((transaction) => (
+                                <TableRow key={transaction.id} hover>
+                                  <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
+                                        {getTransactionIcon(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
+                                      </Avatar>
+                                      <Typography variant="body2" fontWeight="500">
+                                        {getTransactionTypeLabel(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
+                                      </Typography>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">{transaction.month} {transaction.year}</Typography>
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <Typography variant="body2" fontWeight="600">
+                                      Rs. {transaction.amount?.toLocaleString()}
+                                    </Typography>
+                                  </TableCell>
+                                  {/* <TableCell align="right">
+                                    {getStatusChip(calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount))}
+                                  </TableCell> */}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                          <HistoryIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                          <Typography variant="body1" color="text.secondary">
+                            No transaction history available.
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                  {activeTab === 2 && (
+                    <Box>
+                      <Typography variant="h6" fontWeight="600" gutterBottom>
+                        Complete Transaction History
+                      </Typography>
+                      {/* Full transaction table would go here */}
+                      <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                        <Typography variant="body1" color="text.secondary">
+                          Full transaction history view
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
+        </Container>
+      </Box>
 
-        {/* Rent Payment History */}
-        <Paper sx={{ p: 3, borderRadius: 2, mb: 4 }}>
-          <Typography variant="h6" fontWeight="600" gutterBottom>
-            Rent Payment History
+      {/* Edit Profile Dialog */}
+      <Dialog 
+        open={openEditDialog} 
+        onClose={handleCloseEditDialog} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ 
+          sx: { 
+            borderRadius: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
+            backdropFilter: 'blur(20px)'
+          } 
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h5" fontWeight="600">
+            Edit Profile
           </Typography>
-          
-          {rentHistory.length > 0 ? (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Month/Year</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Received</TableCell>
-                    <TableCell>Balance</TableCell>
-                    <TableCell>Paid Date</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rentHistory.map((rent) => (
-                    <TableRow key={rent.id} hover>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight="500">
-                            {rent.month}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {rent.year}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>Rs. {rent.amount}</TableCell>
-                      <TableCell>Rs. {rent.receivedAmount || 0}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body2" 
-                          color={calculateRemainingBalance(rent.amount, rent.receivedAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{rent.paidDate || 'N/A'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <HistoryIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary">
-                No rent history available yet.
-              </Typography>
-            </Box>
-          )}
-        </Paper>
-
-        {/* Bill Payment History */}
-        <Paper sx={{ p: 3, borderRadius: 2, mb: 4 }}>
-          <Typography variant="h6" fontWeight="600" gutterBottom>
-            Bill Payment History
-          </Typography>
-          
-          {billHistory.length > 0 ? (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Bill Type</TableCell>
-                    <TableCell>Month/Year</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Balance</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {billHistory.map((bill) => (
-                    <TableRow key={bill.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                            {getTransactionIcon(bill.type, bill.type)}
-                          </Avatar>
-                          <Typography variant="body2" fontWeight="500">
-                            {getTransactionTypeLabel(bill.type, bill.type)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight="500">
-                            {bill.month}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {bill.year}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>Rs. {bill.amount}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body2" 
-                          color={calculateRemainingBalance(bill.amount, bill.paidAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary">
-                No bill history available yet.
-              </Typography>
-            </Box>
-          )}
-        </Paper>
-
-        {/* All Transactions */}
-        {/* <Paper sx={{ p: 3, borderRadius: 2 }}>
-          <Typography variant="h6" fontWeight="600" gutterBottom>
-            All Transactions
-          </Typography>
-          
-          {getConsolidatedTransactions().length > 0 ? (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Month/Year</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Paid</TableCell>
-                    <TableCell>Balance</TableCell>
-                   
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getConsolidatedTransactions().map((transaction) => (
-                    <TableRow key={transaction.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                            {getTransactionIcon(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
-                          </Avatar>
-                          <Typography variant="body2" fontWeight="500">
-                            {getTransactionTypeLabel(transaction.type, transaction.type === 'bill' ? transaction.type : null)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight="500">
-                            {transaction.month}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {transaction.year}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>Rs. {transaction.amount}</TableCell>
-                      <TableCell>Rs. {transaction.receivedAmount || transaction.paidAmount || 0}</TableCell>
-                      <TableCell>
-                        <Typography 
-                          variant="body2" 
-                          color={calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount) > 0 ? 'error.main' : 'success.main'}
-                        >
-                          Rs. {calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount)}
-                        </Typography>
-                      </TableCell>
-                     
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <TrendingUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary">
-                No transactions available yet.
-              </Typography>
-            </Box>
-          )}
-        </Paper> */}
-
-        {/* Edit Profile Dialog */}
-        <Dialog 
-          open={openEditDialog} 
-          onClose={handleCloseEditDialog} 
-          maxWidth="sm" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle>
-            <Typography variant="h6" fontWeight="600">
-              Edit Profile
-            </Typography>
-          </DialogTitle>
-          
-          <DialogContent>
-            <Box sx={{ pt: 2 }}>
-              <TextField
-                fullWidth
-                label="First Name"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                margin="normal"
-                variant="outlined"
-              />
-              <TextField
-                fullWidth
-                label="Last Name"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                margin="normal"
-                variant="outlined"
-              />
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                value={formData.email}
-                disabled
-                margin="normal"
-                helperText="Email cannot be changed"
-                variant="outlined"
-              />
-            </Box>
-          </DialogContent>
-          
-          <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={handleCloseEditDialog} 
+        </DialogTitle>
+        
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <TextField
+              fullWidth
+              label="First Name"
+              name="firstName"
+              value={formData.firstName}
+              onChange={handleChange}
+              margin="normal"
               variant="outlined"
               sx={{ borderRadius: 2 }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained"
+            />
+            <TextField
+              fullWidth
+              label="Last Name"
+              name="lastName"
+              value={formData.lastName}
+              onChange={handleChange}
+              margin="normal"
+              variant="outlined"
               sx={{ borderRadius: 2 }}
-            >
-              Update Profile
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
+            />
+            <TextField
+              fullWidth
+              label="Email"
+              name="email"
+              value={formData.email}
+              disabled
+              margin="normal"
+              helperText="Email cannot be changed"
+              variant="outlined"
+              sx={{ borderRadius: 2 }}
+            />
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3 }}>
+          <Button 
+            onClick={handleCloseEditDialog} 
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained"
+            sx={{ 
+              borderRadius: 2, 
+              px: 3,
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
+            }}
+          >
+            Update Profile
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
