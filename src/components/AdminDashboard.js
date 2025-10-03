@@ -35,6 +35,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -53,6 +57,9 @@ import {
   VisibilityOff,
   PhotoCamera,
   CloudUpload,
+  Share as ShareIcon,
+  WhatsApp as WhatsAppIcon,
+  Sms as SmsIcon,
 } from '@mui/icons-material';
 import WindPowerIcon from '@mui/icons-material/WindPower';
 import { useAuth } from '../contexts/AuthContext';
@@ -71,13 +78,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { uploadImageToCloudinary, deleteImageFromCloudinary, validateImageFile } from '../cloudinary/uploadUtils';
-// import { CloudinaryService } from '../cloudinary/services/cloudinaryService';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import UserCard from './UserCard';
-
-// TabPanel component
-
 
 // Main AdminDashboard component
 export default function AdminDashboard() {
@@ -153,119 +156,13 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
-  // Add this inside your AdminDashboard component, after the state declarations
-  // Add these states after the existing ones
   const [nicFrontImage, setNicFrontImage] = useState(null);
   const [nicFrontPreview, setNicFrontPreview] = useState(null);
   const [nicBackImage, setNicBackImage] = useState(null);
   const [nicBackPreview, setNicBackPreview] = useState(null);
   const [uploadingNic, setUploadingNic] = useState(false);
-  // NIC Upload Functions
-  const handleNicFrontSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const validation = validateImageFile(file);
-      if (!validation.valid) {
-        setError(validation.error);
-        return;
-      }
-
-      setNicFrontImage(file);
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setNicFrontPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleNicBackSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const validation = validateImageFile(file);
-      if (!validation.valid) {
-        setError(validation.error);
-        return;
-      }
-
-      setNicBackImage(file);
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setNicBackPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadNicImages = async (userId) => {
-    if (!nicFrontImage && !nicBackImage) return null;
-
-    try {
-      setUploadingNic(true);
-      setError('');
-
-      const nicDocuments = {};
-
-      // Upload NIC Front
-      if (nicFrontImage) {
-        console.log('📷 Uploading NIC Front...');
-        const frontResult = await uploadImageToCloudinary(nicFrontImage, 'nic-documents');
-
-        if (frontResult.success) {
-          nicDocuments.front = {
-            url: frontResult.url,
-            public_id: frontResult.public_id
-          };
-          console.log('✅ NIC Front uploaded successfully');
-        } else {
-          throw new Error(`NIC Front upload failed: ${frontResult.error}`);
-        }
-      }
-
-      // Upload NIC Back
-      if (nicBackImage) {
-        console.log('📷 Uploading NIC Back...');
-        const backResult = await uploadImageToCloudinary(nicBackImage, 'nic-documents');
-
-        if (backResult.success) {
-          nicDocuments.back = {
-            url: backResult.url,
-            public_id: backResult.public_id
-          };
-          console.log('✅ NIC Back uploaded successfully');
-        } else {
-          throw new Error(`NIC Back upload failed: ${backResult.error}`);
-        }
-      }
-
-      return nicDocuments;
-
-    } catch (error) {
-      console.error('❌ Error uploading NIC images:', error);
-      setError('Failed to upload NIC images: ' + error.message);
-      return null;
-    } finally {
-      setUploadingNic(false);
-    }
-  };
-
-  const deleteOldNicImages = async (nicDocuments) => {
-    if (!nicDocuments) return;
-
-    try {
-      if (nicDocuments.front && nicDocuments.front.public_id) {
-        await deleteImageFromCloudinary(nicDocuments.front.public_id);
-      }
-      if (nicDocuments.back && nicDocuments.back.public_id) {
-        await deleteImageFromCloudinary(nicDocuments.back.public_id);
-      }
-    } catch (error) {
-      console.error('Error deleting old NIC images:', error);
-      // Don't throw error as this is not critical
-    }
-  };
+  const [shareAnchorEl, setShareAnchorEl] = useState(null);
+  const [selectedUserForShare, setSelectedUserForShare] = useState(null);
 
   const months = [
     'January',
@@ -297,6 +194,160 @@ export default function AdminDashboard() {
     fetchMonthlyRents();
     fetchMonthlyBills();
   }, []);
+
+  // Share functionality
+  const handleShareClick = (event, user) => {
+    setShareAnchorEl(event.currentTarget);
+    setSelectedUserForShare(user);
+  };
+
+  const handleShareClose = () => {
+    setShareAnchorEl(null);
+    setSelectedUserForShare(null);
+  };
+
+ const generateMonthlyQuotation = (user) => {
+  if (!user) return '';
+
+  // UserCard ke same calculations use karein
+  const userRents = monthlyRents.filter(
+    rent => rent.userId === user.id && 
+    rent.month === selectedMonth && 
+    rent.year === selectedYear
+  );
+  
+  const userBills = monthlyBills.filter(
+    bill => bill.userId === user.id && 
+    bill.month === selectedMonth && 
+    bill.year === selectedYear
+  );
+
+  // Current month ke totals - exactly UserCard ke hisaab se
+  const totalRent = userRents.reduce((sum, rent) => sum + (Number(rent.amount) || 0), 0);
+  const receivedRent = userRents.reduce((sum, rent) => sum + (Number(rent.receivedAmount) || 0), 0);
+  const totalBill = userBills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
+  const paidBill = userBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
+
+  const total = totalRent + totalBill;
+  const received = receivedRent + paidBill;
+  const monthBalance = total - received;
+
+  // Previous balance - exactly UserCard ke hisaab se
+  const previousRents = monthlyRents.filter(rent => {
+    if (rent.userId !== user.id) return false;
+    
+    const rentDate = new Date(`${rent.month} 1, ${rent.year}`);
+    const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
+    
+    return rentDate < selectedDate;
+  });
+  
+  const previousBills = monthlyBills.filter(bill => {
+    if (bill.userId !== user.id) return false;
+    
+    const billDate = new Date(`${bill.month} 1, ${bill.year}`);
+    const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
+    
+    return billDate < selectedDate;
+  });
+
+  const previousRentBalance = previousRents.reduce((sum, rent) => {
+    const rentAmount = Number(rent.amount) || 0;
+    const receivedAmount = Number(rent.receivedAmount) || 0;
+    return sum + Math.max(0, rentAmount - receivedAmount);
+  }, 0);
+
+  const previousBillBalance = previousBills.reduce((sum, bill) => {
+    const billAmount = Number(bill.amount) || 0;
+    const paidAmount = Number(bill.paidAmount) || 0;
+    return sum + Math.max(0, billAmount - paidAmount);
+  }, 0);
+
+  const previousBalance = previousRentBalance + previousBillBalance;
+  const currentBalance = previousBalance + monthBalance;
+
+  // Detailed breakdown - UserCard ke format ke hisaab se
+  const rentBreakdown = userRents.map(rent => {
+    const rentAmount = Number(rent.amount) || 0;
+    const receivedAmount = Number(rent.receivedAmount) || 0;
+    const remaining = rentAmount - receivedAmount;
+    
+    return `• Monthly Rent: Rs. ${rentAmount.toLocaleString()} (Received: Rs. ${receivedAmount.toLocaleString()}, Due: Rs. ${remaining.toLocaleString()})`;
+  }).join('\n');
+
+  const billBreakdown = userBills.map(bill => {
+    const billAmount = Number(bill.amount) || 0;
+    const paidAmount = Number(bill.paidAmount) || 0;
+    const remaining = billAmount - paidAmount;
+    
+    return `• ${getTransactionTypeLabel('bill', bill.type)}: Rs. ${billAmount.toLocaleString()} (Paid: Rs. ${paidAmount.toLocaleString()}, Due: Rs. ${remaining.toLocaleString()})`;
+  }).join('\n');
+
+  return `🏠 *Monthly Quotation - ${selectedMonth} ${selectedYear}*
+
+👤 *Tenant Details:*
+• Name: ${user.firstName} ${user.lastName}
+• Property: ${user.propertyName || 'Rental Property'}
+
+📊 *Payment Summary:*
+
+*Previous Balance: Rs. ${previousBalance.toLocaleString()}*
+
+*Current Month (${selectedMonth} ${selectedYear}):*
+${rentBreakdown || '• No rent entries for this month'}
+
+${billBreakdown || '• No bills for this month'}
+
+*Current Month Totals:*
+• Total Rent: Rs. ${totalRent.toLocaleString()}
+• Total Bills: Rs. ${totalBill.toLocaleString()}
+• Total Received/Paid: Rs. ${received.toLocaleString()}
+• Month Balance: Rs. ${monthBalance.toLocaleString()}
+
+💰 *GRAND TOTAL DUE: Rs. ${currentBalance.toLocaleString()}*
+
+📅 Due Date: 5th of next month
+📍 Please make payments by the due date to avoid late fees.
+
+Thank you for your timely payments! 🏡`;
+};
+
+  const shareViaWhatsApp = (user) => {
+    const message = generateMonthlyQuotation(user);
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+    handleShareClose();
+    setSuccess(`Monthly quotation sent via WhatsApp to ${user.firstName} ${user.lastName}`);
+  };
+
+  const shareViaSMS = (user) => {
+    const message = generateMonthlyQuotation(user);
+    const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+    window.open(smsUrl, '_blank');
+    handleShareClose();
+    setSuccess(`Monthly quotation sent via SMS to ${user.firstName} ${user.lastName}`);
+  };
+
+  const shareAllTenants = (method) => {
+    const tenants = users.filter(user => user.role === 'user');
+    tenants.forEach((user, index) => {
+      setTimeout(() => {
+        if (method === 'whatsapp') {
+          const message = generateMonthlyQuotation(user);
+          const encodedMessage = encodeURIComponent(message);
+          const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+          window.open(whatsappUrl, '_blank');
+        } else if (method === 'sms') {
+          const message = generateMonthlyQuotation(user);
+          const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+          window.open(smsUrl, '_blank');
+        }
+      }, index * 1000); // Stagger openings to avoid popup blockers
+    });
+    handleShareClose();
+    setSuccess(`Monthly quotations sent to all ${tenants.length} tenants via ${method === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+  };
 
   const handleLogout = async () => {
     try {
@@ -402,8 +453,6 @@ export default function AdminDashboard() {
         balance: totalRemainingBalance,
       });
 
-
-
       setSuccess('Rent entry updated successfully');
       fetchMonthlyRents();
       fetchUsers();
@@ -412,7 +461,6 @@ export default function AdminDashboard() {
       setError('Failed to update rent entry');
     }
   };
-  //  console.log("previous",totalRemainingBalance);
 
   const updateBillEntry = async (bill) => {
     try {
@@ -467,7 +515,6 @@ export default function AdminDashboard() {
         rentStartDate: user.rentStartDate || '',
         rentEndDate: user.rentEndDate || '',
       });
-      // Set existing profile picture preview if available
       setImagePreview(user.profilePicture?.url || null);
     } else {
       setEditingUser(null);
@@ -483,10 +530,8 @@ export default function AdminDashboard() {
         rentStartDate: '',
         rentEndDate: '',
       });
-      // Clear image preview for new user
       setImagePreview(null);
     }
-    // Reset image selection
     setSelectedImage(null);
     setOpenDialog(true);
   };
@@ -610,10 +655,9 @@ export default function AdminDashboard() {
 
   const handleSubmit = async () => {
     try {
-      setError(''); // Clear previous errors
+      setError('');
 
       if (editingUser) {
-        // Handle profile picture upload
         let profilePictureData = editingUser.profilePicture;
         if (selectedImage) {
           if (editingUser.profilePicture && editingUser.profilePicture.public_id) {
@@ -625,15 +669,12 @@ export default function AdminDashboard() {
           }
         }
 
-        // Handle NIC images upload
         let nicDocuments = editingUser.nicDocuments;
         if (nicFrontImage || nicBackImage) {
-          // Delete old NIC images if they exist
           if (editingUser.nicDocuments) {
             await deleteOldNicImages(editingUser.nicDocuments);
           }
 
-          // Upload new NIC images
           const newNicDocuments = await uploadNicImages(editingUser.id);
           if (newNicDocuments) {
             nicDocuments = {
@@ -660,13 +701,11 @@ export default function AdminDashboard() {
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
 
-        // Upload profile picture
         let profilePictureData = null;
         if (selectedImage) {
           profilePictureData = await uploadProfilePicture(userCredential.user.uid);
         }
 
-        // Upload NIC images
         let nicDocuments = null;
         if (nicFrontImage || nicBackImage) {
           nicDocuments = await uploadNicImages(userCredential.user.uid);
@@ -693,7 +732,6 @@ export default function AdminDashboard() {
         setSuccess('User added successfully and rent entries generated');
       }
 
-      // Reset all image states
       setSelectedImage(null);
       setImagePreview(null);
       setNicFrontImage(null);
@@ -709,11 +747,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // Profile Picture Upload Functions
   const handleImageSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file using Cloudinary utility
       const validation = validateImageFile(file);
       if (!validation.valid) {
         setError(validation.error);
@@ -722,7 +758,6 @@ export default function AdminDashboard() {
 
       setSelectedImage(file);
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
@@ -731,17 +766,15 @@ export default function AdminDashboard() {
     }
   };
 
-  // In AdminDashboard.js - update the uploadProfilePicture function
   const uploadProfilePicture = async (userId) => {
     if (!selectedImage) return null;
 
     try {
       setUploadingImage(true);
-      setError(''); // Clear previous errors
+      setError('');
 
       console.log('Starting image upload for user:', userId);
 
-      // Upload to Cloudinary
       const result = await uploadImageToCloudinary(selectedImage, 'profile-pictures');
 
       if (result.success) {
@@ -764,6 +797,7 @@ export default function AdminDashboard() {
       setUploadingImage(false);
     }
   };
+
   const deleteOldProfilePicture = async (imageData) => {
     if (!imageData || !imageData.public_id) return;
 
@@ -774,7 +808,109 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Error deleting old image:', error);
-      // Don't throw error as this is not critical
+    }
+  };
+
+  const handleNicFrontSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      setNicFrontImage(file);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNicFrontPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleNicBackSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      setNicBackImage(file);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNicBackPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadNicImages = async (userId) => {
+    if (!nicFrontImage && !nicBackImage) return null;
+
+    try {
+      setUploadingNic(true);
+      setError('');
+
+      const nicDocuments = {};
+
+      if (nicFrontImage) {
+        console.log('📷 Uploading NIC Front...');
+        const frontResult = await uploadImageToCloudinary(nicFrontImage, 'nic-documents');
+
+        if (frontResult.success) {
+          nicDocuments.front = {
+            url: frontResult.url,
+            public_id: frontResult.public_id
+          };
+          console.log('✅ NIC Front uploaded successfully');
+        } else {
+          throw new Error(`NIC Front upload failed: ${frontResult.error}`);
+        }
+      }
+
+      if (nicBackImage) {
+        console.log('📷 Uploading NIC Back...');
+        const backResult = await uploadImageToCloudinary(nicBackImage, 'nic-documents');
+
+        if (backResult.success) {
+          nicDocuments.back = {
+            url: backResult.url,
+            public_id: backResult.public_id
+          };
+          console.log('✅ NIC Back uploaded successfully');
+        } else {
+          throw new Error(`NIC Back upload failed: ${backResult.error}`);
+        }
+      }
+
+      return nicDocuments;
+
+    } catch (error) {
+      console.error('❌ Error uploading NIC images:', error);
+      setError('Failed to upload NIC images: ' + error.message);
+      return null;
+    } finally {
+      setUploadingNic(false);
+    }
+  };
+
+  const deleteOldNicImages = async (nicDocuments) => {
+    if (!nicDocuments) return;
+
+    try {
+      if (nicDocuments.front && nicDocuments.front.public_id) {
+        await deleteImageFromCloudinary(nicDocuments.front.public_id);
+      }
+      if (nicDocuments.back && nicDocuments.back.public_id) {
+        await deleteImageFromCloudinary(nicDocuments.back.public_id);
+      }
+    } catch (error) {
+      console.error('Error deleting old NIC images:', error);
     }
   };
 
@@ -1004,20 +1140,19 @@ export default function AdminDashboard() {
     }
   };
 
-  const totalUsers = users.length;
-  const totalRent = users.reduce((sum, user) => sum + (user.monthlyRent || 0), 0);
-  const totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'paid':
-        return 'success';
-      case 'pending':
-        return 'warning';
-      case 'overdue':
-        return 'error';
+  const getTransactionTypeLabel = (type, billType) => {
+    if (type === 'rent') return 'Rent';
+    switch (billType) {
+      case 'electric':
+        return 'Electric Bill';
+      case 'ssgc':
+        return 'SSGC Bill';
+      case 'motor':
+        return 'Motor Bill';
+      case 'maintenance':
+        return 'Maintenance';
       default:
-        return 'default';
+        return billType || 'Bill';
     }
   };
 
@@ -1037,19 +1172,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const getTransactionTypeLabel = (type, billType) => {
-    if (type === 'rent') return 'Rent';
-    switch (billType) {
-      case 'electric':
-        return 'Electric Bill';
-      case 'ssgc':
-        return 'SSGC Bill';
-      case 'motor':
-        return 'Motor Bill';
-      case 'maintenance':
-        return 'Maintenance';
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'overdue':
+        return 'error';
       default:
-        return billType || 'Bill';
+        return 'default';
     }
   };
 
@@ -1116,6 +1248,50 @@ export default function AdminDashboard() {
     setTimeout(() => setSuccess(''), 2000);
   };
 
+  const ShareMenu = () => (
+    <Menu
+      anchorEl={shareAnchorEl}
+      open={Boolean(shareAnchorEl)}
+      onClose={handleShareClose}
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          mt: 1,
+          minWidth: 200
+        }
+      }}
+    >
+      {selectedUserForShare && (
+        <>
+          <MenuItem onClick={() => shareViaWhatsApp(selectedUserForShare)}>
+            <ListItemIcon>
+              <WhatsAppIcon color="success" />
+            </ListItemIcon>
+            <ListItemText primary="Share via WhatsApp" />
+          </MenuItem>
+          <MenuItem onClick={() => shareViaSMS(selectedUserForShare)}>
+            <ListItemIcon>
+              <SmsIcon color="info" />
+            </ListItemIcon>
+            <ListItemText primary="Share via SMS" />
+          </MenuItem>
+        </>
+      )}
+      <MenuItem onClick={() => shareAllTenants('whatsapp')}>
+        <ListItemIcon>
+          <WhatsAppIcon color="success" />
+        </ListItemIcon>
+        <ListItemText primary="Share All via WhatsApp" />
+      </MenuItem>
+      <MenuItem onClick={() => shareAllTenants('sms')}>
+        <ListItemIcon>
+          <SmsIcon color="info" />
+        </ListItemIcon>
+        <ListItemText primary="Share All via SMS" />
+      </MenuItem>
+    </Menu>
+  );
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh" flexDirection="column">
@@ -1131,6 +1307,9 @@ export default function AdminDashboard() {
   }
 
   const { receivedByUser, totalReceivedAllUsers } = calculateMonthlyReceivedAmounts();
+  const totalUsers = users.length;
+  const totalRent = users.reduce((sum, user) => sum + (user.monthlyRent || 0), 0);
+  const totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
 
   return (
     <>
@@ -1149,6 +1328,16 @@ export default function AdminDashboard() {
             </Typography>
           </Box>
           <Box display="flex" alignItems="center">
+            <Tooltip title="Share Monthly Quotations">
+              <IconButton 
+                color="inherit" 
+                onClick={(e) => handleShareClick(e)}
+                sx={{ mr: 1 }}
+              >
+                <ShareIcon />
+              </IconButton>
+            </Tooltip>
+
             <Avatar
               sx={{
                 width: 40,
@@ -1175,6 +1364,8 @@ export default function AdminDashboard() {
         </Toolbar>
       </AppBar>
 
+      <ShareMenu />
+
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         {error && (
           <Fade in={!!error}>
@@ -1200,13 +1391,20 @@ export default function AdminDashboard() {
           </Typography>
         </Box>
 
-        {/* Monthly Received Amounts Section */}
         <Paper elevation={2} sx={{ borderRadius: 3, mb: 4, p: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
             <Typography variant="h6" fontWeight="600">
               Monthly Received Amounts ({selectedMonth} {selectedYear})
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Button
+                variant="outlined"
+                startIcon={<ShareIcon />}
+                onClick={(e) => handleShareClick(e)}
+                size="small"
+              >
+                Share Quotations
+              </Button>
               <FormControl sx={{ minWidth: 120 }}>
                 <InputLabel>Month</InputLabel>
                 <Select
@@ -1245,24 +1443,38 @@ export default function AdminDashboard() {
                 <TableRow>
                   <TableCell>Tenant</TableCell>
                   <TableCell align="right">Total Received (Rs.)</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {receivedByUser.map((user) => (
-                  <TableRow key={user.userId} hover>
-                    <TableCell>
-                      <Typography variant="body1" fontWeight="500">
-                        {user.userName}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body1" color="success.main">
-                        Rs. {user.totalReceived.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-
-                  </TableRow>
-                ))}
+                {receivedByUser.map((user) => {
+                  const userData = users.find(u => u.id === user.userId);
+                  return (
+                    <TableRow key={user.userId} hover>
+                      <TableCell>
+                        <Typography variant="body1" fontWeight="500">
+                          {user.userName}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body1" color="success.main">
+                          Rs. {user.totalReceived.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Share monthly quotation">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleShareClick(e, userData)}
+                            color="primary"
+                          >
+                            <ShareIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow>
                   <TableCell>
                     <Typography variant="body1" fontWeight="600">
@@ -1274,6 +1486,7 @@ export default function AdminDashboard() {
                       Rs. {totalReceivedAllUsers.toLocaleString()}
                     </Typography>
                   </TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -1287,7 +1500,6 @@ export default function AdminDashboard() {
             </Box>
           )}
         </Paper>
-
 
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
@@ -1411,30 +1623,30 @@ export default function AdminDashboard() {
             </Box>
           </Box>
           <Grid container spacing={3} sx={{ p: 2 }}>
-
             {users.map((user) => (
               <Grid item xs={12} md={6} lg={4} key={user.id}>
-                <UserCard
-                  user={user}
-                  monthlyRents={monthlyRents}
-                  monthlyBills={monthlyBills}
-                  handleOpenDialog={handleOpenDialog}
-                  handleDeleteUser={handleDeleteUser}
-                  handleOpenRentDialog={handleOpenRentDialog}
-                  handleOpenBillDialog={handleOpenBillDialog}
-                  handleDeleteRent={handleDeleteRent}
-                  handleDeleteBill={handleDeleteBill}
-                  theme={theme}
-                  months={months}
-                  years={years}
-                  getTransactionTypeLabel={getTransactionTypeLabel}
-                  getTransactionIcon={getTransactionIcon}
-                  calculateRemainingBalance={calculateRemainingBalance}
-                  getStatusColor={getStatusColor}
-                  currentUser={currentUser}
-                  updateRentEntry={updateRentEntry}
-                  updateBillEntry={updateBillEntry}
-                />
+               <UserCard
+  user={user}
+  monthlyRents={monthlyRents}
+  monthlyBills={monthlyBills}
+  handleOpenDialog={handleOpenDialog}
+  handleDeleteUser={handleDeleteUser}
+  handleOpenRentDialog={handleOpenRentDialog}
+  handleOpenBillDialog={handleOpenBillDialog}
+  handleDeleteRent={handleDeleteRent}
+  handleDeleteBill={handleDeleteBill}
+  theme={theme}
+  months={months}
+  years={years}
+  getTransactionTypeLabel={getTransactionTypeLabel}
+  getTransactionIcon={getTransactionIcon}
+  calculateRemainingBalance={calculateRemainingBalance}
+  getStatusColor={getStatusColor}
+  currentUser={currentUser}
+  updateRentEntry={updateRentEntry}
+  updateBillEntry={updateBillEntry}
+  onShareClick={handleShareClick} // Yeh line add karein
+/>
               </Grid>
             ))}
           </Grid>
@@ -1453,7 +1665,6 @@ export default function AdminDashboard() {
             </Typography>
           </DialogTitle>
           <DialogContent>
-
             {!editingUser && (
               <Alert severity="info" sx={{ mb: 2 }}>
                 This will create a new tenant account with email and password.
@@ -1497,14 +1708,12 @@ export default function AdminDashboard() {
                   />
                 </Grid>
 
-                {/* Profile Picture Upload */}
                 <Grid item xs={12}>
                   <Box sx={{ mt: 2, mb: 2 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       Profile Picture
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      {/* Profile Picture Preview */}
                       <Avatar
                         src={imagePreview}
                         sx={{
@@ -1517,7 +1726,6 @@ export default function AdminDashboard() {
                         <PhotoCamera />
                       </Avatar>
 
-                      {/* Upload Button */}
                       <Box>
                         <input
                           accept="image/*"
@@ -1545,15 +1753,12 @@ export default function AdminDashboard() {
                   </Box>
                 </Grid>
 
-
-                {/* NIC Documents Upload */}
                 <Grid item xs={12}>
                   <Box sx={{ mt: 2, mb: 2 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       NIC Documents (Front & Back)
                     </Typography>
                     <Grid container spacing={2}>
-                      {/* NIC Front */}
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" gutterBottom>
                           NIC Front Side
@@ -1594,7 +1799,6 @@ export default function AdminDashboard() {
                         </Box>
                       </Grid>
 
-                      {/* NIC Back */}
                       <Grid item xs={12} sm={6}>
                         <Typography variant="body2" gutterBottom>
                           NIC Back Side
@@ -1875,7 +2079,21 @@ export default function AdminDashboard() {
                     disabled={rentFormData.status === 'paid'}
                   />
                 </Grid>
-
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={rentFormData.status}
+                      label="Status"
+                      onChange={(e) => setRentFormData({ ...rentFormData, status: e.target.value })}
+                      variant="outlined"
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="paid">Paid</MenuItem>
+                      <MenuItem value="overdue">Overdue</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -2022,9 +2240,49 @@ export default function AdminDashboard() {
                     }}
                   />
                 </Grid>
-
-
-
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Paid Amount"
+                    type="number"
+                    value={billFormData.paidAmount}
+                    onChange={(e) => setBillFormData({ ...billFormData, paidAmount: e.target.value })}
+                    margin="normal"
+                    variant="outlined"
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">Rs.</InputAdornment>,
+                    }}
+                    disabled={billFormData.status === 'paid'}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={billFormData.status}
+                      label="Status"
+                      onChange={(e) => setBillFormData({ ...billFormData, status: e.target.value })}
+                      variant="outlined"
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="paid">Paid</MenuItem>
+                      <MenuItem value="overdue">Overdue</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Paid Date"
+                    type="date"
+                    value={billFormData.paidDate}
+                    onChange={(e) => setBillFormData({ ...billFormData, paidDate: e.target.value })}
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                    variant="outlined"
+                    disabled={billFormData.status !== 'paid'}
+                  />
+                </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth

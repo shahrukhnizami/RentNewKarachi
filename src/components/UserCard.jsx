@@ -21,12 +21,14 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
   AttachMoney as MoneyIcon,
+  WhatsApp as WhatsAppIcon,
 } from '@mui/icons-material';
 import { serverTimestamp } from 'firebase/firestore';
 
@@ -147,6 +149,51 @@ function UserCard({
   const previousBalance = calculatePreviousBalance();
   const currentBalance = previousBalance + monthBalance;
 
+  // WhatsApp Share Function
+  const shareViaWhatsApp = () => {
+    const message = generateWhatsAppQuotation();
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // Generate WhatsApp Quotation
+  const generateWhatsAppQuotation = () => {
+    const rentBreakdown = userRents.map(rent => {
+      const rentAmount = Number(rent.amount) || 0;
+      const receivedAmount = Number(rent.receivedAmount) || 0;
+      const remaining = rentAmount - receivedAmount;
+      
+      return `🏠 Rent: Rs. ${rentAmount.toLocaleString()}\n `;
+    });
+
+    const billBreakdown = userBills.map(bill => {
+      const billAmount = Number(bill.amount) || 0;
+      const paidAmount = Number(bill.paidAmount) || 0;
+      const remaining = billAmount - paidAmount;
+      
+      return `💡 ${getTransactionTypeLabel('bill', bill.type)}: Rs. ${billAmount.toLocaleString()}\n   Paid: Rs. ${paidAmount.toLocaleString()}\n   Due: Rs. ${remaining.toLocaleString()}`;
+    }).join('\n\n');
+
+    return `*🏠 Monthly Quotation - ${selectedMonth} ${selectedYear}*
+
+*👤 Tenant Details:*
+• Name: ${user.firstName} ${user.lastName}
+*📊 Payment Summary:*
+${rentBreakdown || '🏠 No rent entries for this month'}
+${billBreakdown ? '\n' + billBreakdown : '💡 No bills for this month'}
+*💰 Financial Summary:*
+• Rent: Rs. ${totalRent.toLocaleString()}
+• Received/Paid: Rs. ${received.toLocaleString()}
+• Previous balance: Rs. ${previousBalance.toLocaleString()}
+• *Grand Total: Rs. ${currentBalance.toLocaleString()}*
+
+📅 Due Date: 15th of month
+📍 Please make payments by the due date to avoid late fees.
+
+Thank you for your timely payments! 🏡`;
+  };
+
   const handleOpenReceiveDialog = (entry, type) => {
     setSelectedEntry(entry);
     setEntryType(type);
@@ -216,6 +263,22 @@ function UserCard({
             </Box>
           </Box>
           <Box>
+            {/* WhatsApp Share Button */}
+            <Tooltip title="Share Quotation via WhatsApp">
+              <IconButton 
+                onClick={shareViaWhatsApp} 
+                color="success"
+                sx={{ 
+                  bgcolor: 'success.light', 
+                  '&:hover': { bgcolor: 'success.main' },
+                  color: 'white',
+                  mr: 1
+                }}
+              >
+                <WhatsAppIcon />
+              </IconButton>
+            </Tooltip>
+            
             <IconButton onClick={() => handleOpenDialog(user)} color="primary">
               <EditIcon />
             </IconButton>
@@ -283,6 +346,11 @@ function UserCard({
           >
             Balance: Rs. {currentBalance.toLocaleString()}
           </Typography>
+        </Box>
+
+        {/* WhatsApp Share Button at bottom */}
+        <Box sx={{ mb: 2 }}>
+          
         </Box>
 
         <Tabs

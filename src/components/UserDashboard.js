@@ -1069,7 +1069,7 @@ export default function UserDashboard() {
                                   </Grid>
                                   <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>Total Paid</Typography>
-                                    <Typography variant="h6" fontWeight="600" color="success.light">Rs. {summary.totalPaid.toLocaleString()}</Typography>
+                                    <Typography variant="h6" fontWeight="600" color="b">Rs. {summary.totalPaid.toLocaleString()}</Typography>
                                   </Grid>
                                 </Grid>
                                 <Divider sx={{ my: 2, opacity: 0.3 }} />
