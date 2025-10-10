@@ -48,7 +48,6 @@ function UserCard({
   getTransactionTypeLabel,
   getTransactionIcon,
   calculateRemainingBalance,
-  getStatusColor,
   currentUser,
   updateRentEntry,
   updateBillEntry,
@@ -157,42 +156,49 @@ function UserCard({
     window.open(whatsappUrl, '_blank');
   };
 
-  // Generate WhatsApp Quotation
-  const generateWhatsAppQuotation = () => {
-    const rentBreakdown = userRents.map(rent => {
-      const rentAmount = Number(rent.amount) || 0;
-      const receivedAmount = Number(rent.receivedAmount) || 0;
-      const remaining = rentAmount - receivedAmount;
-      
-      return `🏠 Rent: Rs. ${rentAmount.toLocaleString()}\n `;
-    });
+  // Generate WhatsApp Quotation - Improved Format
+  // Generate WhatsApp Quotation - Fixed Emoji Format
+const generateWhatsAppQuotation = () => {
+  // Rent breakdown
+  const rentBreakdown = userRents.map(rent => {
+    const rentAmount = Number(rent.amount) || 0;
+    
+    return `🏠 Monthly Rent: Rs. ${rentAmount.toLocaleString()}`;
+  });
 
-    const billBreakdown = userBills.map(bill => {
-      const billAmount = Number(bill.amount) || 0;
-      const paidAmount = Number(bill.paidAmount) || 0;
-      const remaining = billAmount - paidAmount;
-      
-      return `💡 ${getTransactionTypeLabel('bill', bill.type)}: Rs. ${billAmount.toLocaleString()}\n   Paid: Rs. ${paidAmount.toLocaleString()}\n   Due: Rs. ${remaining.toLocaleString()}`;
-    }).join('\n\n');
+  // Bill breakdown
+  const billBreakdown = userBills.map(bill => {
+    const billAmount = Number(bill.amount) || 0;
+    
+    return `💡 ${getTransactionTypeLabel('bill', bill.type)}: Rs. ${billAmount.toLocaleString()}`;
+  }).join('\n\n');
 
-    return `*🏠 Monthly Quotation - ${selectedMonth} ${selectedYear}*
+  return `🏠 *MONTHLY QUOTATION - ${selectedMonth.toUpperCase()} ${selectedYear}*
 
-*👤 Tenant Details:*
+👤 *TENANT DETAILS:*
 • Name: ${user.firstName} ${user.lastName}
-*📊 Payment Summary:*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *PAYMENT BREAKDOWN:*
+
 ${rentBreakdown || '🏠 No rent entries for this month'}
+
 ${billBreakdown ? '\n' + billBreakdown : '💡 No bills for this month'}
-*💰 Financial Summary:*
-• Rent: Rs. ${totalRent.toLocaleString()}
-• Received/Paid: Rs. ${received.toLocaleString()}
-• Previous balance: Rs. ${previousBalance.toLocaleString()}
-• *Grand Total: Rs. ${currentBalance.toLocaleString()}*
 
-📅 Due Date: 15th of month
-📍 Please make payments by the due date to avoid late fees.
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-Thank you for your timely payments! 🏡`;
-  };
+💰 *FINANCIAL SUMMARY:*
+
+• Total Rent: Rs. ${totalRent.toLocaleString()}
+• Total Bills: Rs. ${totalBill.toLocaleString()}
+• Total Received/Paid: Rs. ${received.toLocaleString()}
+• Previous Balance: Rs. ${previousBalance.toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💳 *GRAND TOTAL DUE: Rs. ${currentBalance.toLocaleString()}*
+`;
+};
 
   const handleOpenReceiveDialog = (entry, type) => {
     setSelectedEntry(entry);
@@ -220,8 +226,7 @@ Thank you for your timely payments! 🏡`;
         const updatedRent = {
           ...selectedEntry,
           receivedAmount: newReceivedAmount,
-          status: newReceivedAmount >= Number(selectedEntry.amount) ? 'paid' : selectedEntry.status,
-          paidDate: newReceivedAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate,
+          paidDate: new Date().toISOString().split('T')[0],
           updatedAt: serverTimestamp(),
         };
         await updateRentEntry(updatedRent);
@@ -230,8 +235,7 @@ Thank you for your timely payments! 🏡`;
         const updatedBill = {
           ...selectedEntry,
           paidAmount: newPaidAmount,
-          status: newPaidAmount >= Number(selectedEntry.amount) ? 'paid' : selectedEntry.status,
-          paidDate: newPaidAmount >= Number(selectedEntry.amount) ? new Date().toISOString().split('T')[0] : selectedEntry.paidDate,
+          paidDate: new Date().toISOString().split('T')[0],
           updatedAt: serverTimestamp(),
         };
         await updateBillEntry(updatedBill);
@@ -348,11 +352,6 @@ Thank you for your timely payments! 🏡`;
           </Typography>
         </Box>
 
-        {/* WhatsApp Share Button at bottom */}
-        <Box sx={{ mb: 2 }}>
-          
-        </Box>
-
         <Tabs
           value={cardTab}
           onChange={(_, newValue) => setCardTab(newValue)}
@@ -369,12 +368,16 @@ Thank you for your timely payments! 🏡`;
                 <Paper key={rent.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Box>
+                      <Typography variant="body1" fontWeight="500">
+                        Monthly Rent
+                      </Typography>
                       <Typography>Amount: Rs. {Number(rent.amount).toLocaleString()}</Typography>
                       <Typography>Received: Rs. {Number(rent.receivedAmount || 0).toLocaleString()}</Typography>
                       <Typography
                         color={calculateRemainingBalance(rent.amount, rent.receivedAmount) > 0 ? 'error.main' : 'success.main'}
+                        fontWeight="500"
                       >
-                        Balance: Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount).toLocaleString()}
+                        Due: Rs. {calculateRemainingBalance(rent.amount, rent.receivedAmount).toLocaleString()}
                       </Typography>
                     </Box>
                     <Box>
@@ -432,8 +435,9 @@ Thank you for your timely payments! 🏡`;
                       <Typography>Paid: Rs. {Number(bill.paidAmount || 0).toLocaleString()}</Typography>
                       <Typography
                         color={calculateRemainingBalance(bill.amount, bill.paidAmount) > 0 ? 'error.main' : 'success.main'}
+                        fontWeight="500"
                       >
-                        Balance: Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount).toLocaleString()}
+                        Due: Rs. {calculateRemainingBalance(bill.amount, bill.paidAmount).toLocaleString()}
                       </Typography>
                     </Box>
                     <Box>

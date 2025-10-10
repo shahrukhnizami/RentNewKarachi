@@ -40,7 +40,6 @@ import {
   ListItemIcon,
   ListItemText,
   Badge,
-  alpha,
   Popover
 } from '@mui/material';
 import {
@@ -55,14 +54,11 @@ import {
   TrendingUp as TrendingUpIcon,
   Payment as PaymentIcon,
   History as HistoryIcon,
-  // Info as InfoIcon,
   ElectricBolt as ElectricIcon,
   LocalGasStation as GasIcon,
   DirectionsCar as CarIcon,
   Build as MaintenanceIcon,
   Notifications as NotificationsIcon,
-  // Download as DownloadIcon,
-  // ContactSupport as SupportIcon,
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Warning as WarningIcon,
@@ -359,15 +355,14 @@ export default function UserDashboard() {
         alignItems="center" 
         minHeight="100vh"
         flexDirection="column"
-        sx={{
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-        }}
       >
-        <Avatar sx={{ width: 80, height: 80, mb: 2, bgcolor: 'white', color: theme.palette.primary.main }}>
+        <Avatar sx={{ width: 80, height: 80, mb: 2, bgcolor: 'primary.main', color: 'white' }}>
           <AccountBalanceIcon fontSize="large" />
         </Avatar>
-        <Typography variant="h6" gutterBottom color="white">Loading your dashboard...</Typography>
-        <LinearProgress sx={{ width: '50%', maxWidth: 300, mt: 2, bgcolor: 'rgba(255,255,255,0.3)' }} />
+        <Typography variant="h6" gutterBottom>
+          Loading your dashboard...
+        </Typography>
+        <LinearProgress sx={{ width: '50%', maxWidth: 300, mt: 2 }} />
       </Box>
     );
   }
@@ -382,19 +377,18 @@ export default function UserDashboard() {
 
   return (
     <>
+      {/* AppBar - Simple design like AdminDashboard */}
       <AppBar 
         position="sticky" 
-        elevation={0}
-        sx={{ 
-          background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.secondary.main} 90%)`,
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${alpha(theme.palette.background.paper, 0.1)}`
+        elevation={2}
+        sx={{
+          background: theme.palette.primary.main,
         }}
       >
         <Toolbar>
           <Box display="flex" alignItems="center" flexGrow={1}>
-            <AccountBalanceIcon sx={{ mr: 1, fontSize: 32 }} />
-            <Typography variant="h5" component="div" fontWeight="700">
+            <AccountBalanceIcon sx={{ mr: 1 }} />
+            <Typography variant="h6" component="div">
               RentEase
             </Typography>
           </Box>
@@ -403,7 +397,6 @@ export default function UserDashboard() {
             {/* Advance Amount Display */}
             {userData.advanceAmount && (
               <>
-                {/* Desktop View */}
                 {!isMobile ? (
                   <Tooltip title="Click to view advance details">
                     <Button
@@ -428,9 +421,8 @@ export default function UserDashboard() {
                         </Typography>
                       </Box>
                     </Button>
-                </Tooltip>
+                  </Tooltip>
                 ) : (
-                  // Mobile View - Icon only
                   <Tooltip title="Advance Amount">
                     <IconButton 
                       onClick={handleAdvanceClick}
@@ -456,30 +448,24 @@ export default function UserDashboard() {
               color="inherit" 
               onClick={refreshData}
               size="large"
-              sx={{ 
-                transition: 'transform 0.3s',
-                '&:hover': { transform: 'rotate(180deg)' }
-              }}
             >
               <RefreshIcon />
             </IconButton>
             
             <Box display="flex" alignItems="center" sx={{ ml: 1 }}>
-            {/* // In the navbar section, update the Avatar component: */}
-<Avatar 
-  src={userData.profilePicture?.url}
-  sx={{ 
-    width: 40, 
-    height: 40, 
-    mr: 1,
-    bgcolor: userData.profilePicture?.url ? 'transparent' : 'white',
-    color: theme.palette.primary.main,
-    fontWeight: 'bold',
-    border: `2px solid ${alpha(theme.palette.common.white, 0.3)}`
-  }}
->
-  {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
-</Avatar>
+              <Avatar 
+                src={userData.profilePicture?.url}
+                sx={{ 
+                  width: 40, 
+                  height: 40, 
+                  mr: 1,
+                  bgcolor: userData.profilePicture?.url ? 'transparent' : 'white',
+                  color: theme.palette.primary.main,
+                  fontWeight: 'bold',
+                }}
+              >
+                {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
+              </Avatar>
               
               {!isMobile && (
                 <Box>
@@ -520,12 +506,9 @@ export default function UserDashboard() {
         }}
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 2,
             p: 2,
             minWidth: 250,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.95)} 0%, ${alpha(theme.palette.info.dark, 0.95)} 100%)`,
-            color: 'white',
-            backdropFilter: 'blur(20px)'
           }
         }}
       >
@@ -556,24 +539,18 @@ export default function UserDashboard() {
             label="Paid" 
             color="success" 
             size="small"
-            sx={{ color: 'white', fontWeight: '600' }}
           />
         </Box>
       </Popover>
 
-      <Box
-        sx={{
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
-          minHeight: '100vh',
-          py: 4
-        }}
-      >
+      {/* Main Content - Removed gradient background */}
+      <Box sx={{ py: 4 }}>
         <Container maxWidth="xl">
           {error && (
             <Fade in={!!error}>
               <Alert 
                 severity="error" 
-                sx={{ mb: 3, borderRadius: 3 }} 
+                sx={{ mb: 3, borderRadius: 2 }} 
                 onClose={() => setError('')}
               >
                 {error}
@@ -585,7 +562,7 @@ export default function UserDashboard() {
             <Fade in={!!success}>
               <Alert 
                 severity="success" 
-                sx={{ mb: 3, borderRadius: 3 }} 
+                sx={{ mb: 3, borderRadius: 2 }} 
                 onClose={() => setSuccess('')}
               >
                 {success}
@@ -597,12 +574,7 @@ export default function UserDashboard() {
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
               <Box>
-                <Typography variant="h3" fontWeight="700" gutterBottom sx={{ 
-                  background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  color: 'transparent'
-                }}>
+                <Typography variant="h4" fontWeight="600" gutterBottom>
                   Welcome back, {userData.firstName}!
                 </Typography>
                 <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
@@ -615,45 +587,35 @@ export default function UserDashboard() {
                 startIcon={<EditIcon />}
                 onClick={handleOpenEditDialog}
                 sx={{
-                  borderRadius: 3,
+                  borderRadius: 2,
                   px: 3,
                   py: 1,
-                  background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                  boxShadow: `0 8px 25px ${alpha(theme.palette.primary.main, 0.3)}`
                 }}
               >
                 Edit Profile
               </Button>
             </Box>
-
-            {/* Removed the duplicate advance amount card since it's now in navbar */}
           </Box>
 
-          {/* Rest of the dashboard content remains the same */}
-          {/* Key Metrics Cards */}
+          {/* Key Metrics Cards - Simple cards like AdminDashboard */}
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={3}>
               <Zoom in={true} style={{ transitionDelay: '100ms' }}>
                 <Card 
-                  elevation={4}
+                  elevation={3}
                   sx={{ 
-                    borderRadius: 3,
-                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                    borderRadius: 2,
+                    background: theme.palette.primary.main,
                     color: 'white',
                     position: 'relative',
                     overflow: 'hidden',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: `0 16px 40px ${alpha(theme.palette.primary.main, 0.4)}`
-                    }
                   }}
                 >
-                  <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-                    <PersonIcon sx={{ fontSize: 120 }} />
+                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                    <PersonIcon sx={{ fontSize: 80 }} />
                   </Box>
                   <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
                       Tenant
                     </Typography>
                     <Typography variant="h4" fontWeight="700">
@@ -667,25 +629,20 @@ export default function UserDashboard() {
             <Grid item xs={12} sm={6} md={3}>
               <Zoom in={true} style={{ transitionDelay: '200ms' }}>
                 <Card 
-                  elevation={4}
+                  elevation={3}
                   sx={{ 
-                    borderRadius: 3,
-                    background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+                    borderRadius: 2,
+                    background: theme.palette.success.main,
                     color: 'white',
                     position: 'relative',
                     overflow: 'hidden',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: `0 16px 40px ${alpha(theme.palette.success.main, 0.4)}`
-                    }
                   }}
                 >
-                  <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-                    <MoneyIcon sx={{ fontSize: 120 }} />
+                  <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                    <MoneyIcon sx={{ fontSize: 80 }} />
                   </Box>
                   <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
+                    <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
                       Monthly Rent
                     </Typography>
                     <Typography variant="h4" fontWeight="700">
@@ -696,70 +653,58 @@ export default function UserDashboard() {
               </Zoom>
             </Grid>
             
-            
-            
             <Grid item xs={12} sm={6} md={3}>
-              <Zoom in={true} style={{ transitionDelay: '400ms' }}>
-                <Tooltip title="Total bill amount for latest month">
+              <Zoom in={true} style={{ transitionDelay: '300ms' }}>
+                <Tooltip title="Total outstanding balance including rent and bills">
                   <Card 
-                    elevation={4}
+                    elevation={3}
                     sx={{ 
-                      borderRadius: 3,
-                      background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
+                      borderRadius: 2,
+                      background: totalBalance > 0 ? theme.palette.error.main : theme.palette.info.main,
                       color: 'white',
                       position: 'relative',
                       overflow: 'hidden',
-                      transition: 'transform 0.3s, box-shadow 0.3s',
-                      '&:hover': {
-                        transform: 'translateY(-8px)',
-                        boxShadow: `0 16px 40px ${alpha(theme.palette.warning.main, 0.4)}`
-                      }
                     }}
                   >
-                    <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-                      <ReceiptIcon sx={{ fontSize: 120 }} />
+                    <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                      <BalanceIcon sx={{ fontSize: 80 }} />
                     </Box>
                     <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
-                        Total Bills
+                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
+                        Total Balance
                       </Typography>
                       <Typography variant="h4" fontWeight="700">
-                        Rs. {latestSummary.totalBills?.toLocaleString() || 0}
+                        Rs. {totalBalance.toLocaleString()}
                       </Typography>
                     </CardContent>
                   </Card>
                 </Tooltip>
               </Zoom>
             </Grid>
+            
             <Grid item xs={12} sm={6} md={3}>
-              <Zoom in={true} style={{ transitionDelay: '300ms' }}>
-                <Tooltip title="Total outstanding balance including rent and bills">
+              <Zoom in={true} style={{ transitionDelay: '400ms' }}>
+                <Tooltip title="Total bill amount for latest month">
                   <Card 
-                    elevation={4}
+                    elevation={3}
                     sx={{ 
-                      borderRadius: 3,
-                      background: `linear-gradient(135deg, ${totalBalance > 0 ? theme.palette.error.main : theme.palette.info.main} 0%, ${totalBalance > 0 ? theme.palette.error.dark : theme.palette.info.dark} 100%)`,
+                      borderRadius: 2,
+                      background: theme.palette.warning.main,
                       color: 'white',
                       position: 'relative',
                       overflow: 'hidden',
-                      transition: 'transform 0.3s, box-shadow 0.3s',
-                      '&:hover': {
-                        transform: 'translateY(-8px)',
-                        boxShadow: `0 16px 40px ${alpha(totalBalance > 0 ? theme.palette.error.main : theme.palette.info.main, 0.4)}`
-                      }
                     }}
                   >
-                    <Box sx={{ position: 'absolute', top: -20, right: -20, opacity: 0.1 }}>
-                      <BalanceIcon sx={{ fontSize: 120 }} />
+                    <Box sx={{ position: 'absolute', top: 0, right: 0, p: 1, opacity: 0.1 }}>
+                      <ReceiptIcon sx={{ fontSize: 80 }} />
                     </Box>
                     <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.9 }}>
-                        Total Balance
+                      <Typography variant="body2" gutterBottom sx={{ opacity: 0.8 }}>
+                        Total Bills
                       </Typography>
                       <Typography variant="h4" fontWeight="700">
-                        Rs. {totalBalance.toLocaleString()}
+                        Rs. {latestSummary.totalBills?.toLocaleString() || 0}
                       </Typography>
-                     
                     </CardContent>
                   </Card>
                 </Tooltip>
@@ -773,252 +718,166 @@ export default function UserDashboard() {
             <Grid item xs={12} lg={4}>
               <Grid container spacing={3}>
                 {/* Profile Card */}
-                {/* In your UserDashboard.js, update the Profile Card section: */}
-
-{/* Profile Card */}
-<Grid item xs={12}>
-  <Card 
-    elevation={4}
-    sx={{ 
-      borderRadius: 3,
-      background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-      backdropFilter: 'blur(10px)'
-    }}
-  >
-    <CardHeader
-      avatar={
-        <Avatar 
-          src={userData.profilePicture?.url}
-          sx={{ 
-            width: 60, 
-            height: 60,
-            bgcolor: userData.profilePicture?.url ? 'transparent' : theme.palette.primary.main,
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            border: `2px solid ${theme.palette.primary.main}`
-          }}
-        >
-          {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
-        </Avatar>
-      }
-      title={
-        <Typography variant="h6" fontWeight="600">
-          {userData.firstName} {userData.lastName}
-        </Typography>
-      }
-      subheader={userData.email}
-    />
-    <CardContent>
-      <List dense>
-        <ListItem>
-          <ListItemIcon>
-            <PersonIcon color="primary" />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Role" 
-            secondary={
-              <Chip 
-                label={userData.role} 
-                color={userData.role === 'admin' ? 'primary' : 'default'}
-                size="small"
-              />
-            } 
-          />
-        </ListItem>
-        <ListItem>
-          <ListItemIcon>
-            <CalendarIcon color="primary" />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Member Since" 
-            secondary={userData.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'} 
-          />
-        </ListItem>
-        {userData.advanceAmount && (
-          <ListItem>
-            <ListItemIcon>
-              <WalletIcon color="primary" />
-            </ListItemIcon>
-            <ListItemText 
-              primary="Advance Amount" 
-              secondary={`Rs. ${userData.advanceAmount.toLocaleString()}`} 
-            />
-          </ListItem>
-        )}
-      </List>
-
-      {/* NIC Documents Section */}
-      {(userData.nicDocuments?.front || userData.nicDocuments?.back) && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="subtitle2" fontWeight="600" gutterBottom>
-            NIC Documents
-          </Typography>
-          <Grid container spacing={2}>
-            {userData.nicDocuments?.front && (
-              <Grid item xs={6}>
-                <Box 
-                  sx={{ 
-                    textAlign: 'center',
-                    p: 1,
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                  }}
-                >
-                  <Typography variant="caption" display="block" gutterBottom>
-                    NIC Front
-                  </Typography>
-                  <Box
-                    component="img"
-                    src={userData.nicDocuments.front.url}
-                    alt="NIC Front"
-                    sx={{
-                      width: '100%',
-                      maxWidth: 120,
-                      height: 80,
-                      objectFit: 'cover',
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      '&:hover': {
-                        transform: 'scale(1.05)',
-                        transition: 'transform 0.3s'
-                      }
-                    }}
-                    onClick={() => window.open(userData.nicDocuments.front.url, '_blank')}
-                  />
-                </Box>
-              </Grid>
-            )}
-            {userData.nicDocuments?.back && (
-              <Grid item xs={6}>
-                <Box 
-                  sx={{ 
-                    textAlign: 'center',
-                    p: 1,
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                  }}
-                >
-                  <Typography variant="caption" display="block" gutterBottom>
-                    NIC Back
-                  </Typography>
-                  <Box
-                    component="img"
-                    src={userData.nicDocuments.back.url}
-                    alt="NIC Back"
-                    sx={{
-                      width: '100%',
-                      maxWidth: 120,
-                      height: 80,
-                      objectFit: 'cover',
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      '&:hover': {
-                        transform: 'scale(1.05)',
-                        transition: 'transform 0.3s'
-                      }
-                    }}
-                    onClick={() => window.open(userData.nicDocuments.back.url, '_blank')}
-                  />
-                </Box>
-              </Grid>
-            )}
-          </Grid>
-        </Box>
-      )}
-    </CardContent>
-  </Card>
-</Grid>
-
-                {/* Quick Actions */}
-                {/* <Grid item xs={12}>
+                <Grid item xs={12}>
                   <Card 
-                    elevation={4}
+                    elevation={3}
                     sx={{ 
-                      borderRadius: 3,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-                      backdropFilter: 'blur(10px)'
+                      borderRadius: 2,
                     }}
                   >
                     <CardHeader
+                      avatar={
+                        <Avatar 
+                          src={userData.profilePicture?.url}
+                          sx={{ 
+                            width: 60, 
+                            height: 60,
+                            bgcolor: userData.profilePicture?.url ? 'transparent' : theme.palette.primary.main,
+                            fontSize: '1.5rem',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {!userData.profilePicture?.url && `${userData.firstName?.charAt(0)}${userData.lastName?.charAt(0)}`}
+                        </Avatar>
+                      }
                       title={
                         <Typography variant="h6" fontWeight="600">
-                          Quick Actions
+                          {userData.firstName} {userData.lastName}
                         </Typography>
                       }
+                      subheader={userData.email}
                     />
                     <CardContent>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          size="large"
-                          startIcon={<PaymentIcon />}
-                          sx={{
-                            py: 1.5,
-                            borderRadius: 2,
-                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                            boxShadow: `0 4px 15px ${alpha(theme.palette.primary.main, 0.3)}`
-                          }}
-                        >
-                          Make Payment
-                        </Button>
-                        
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          size="large"
-                          startIcon={<DownloadIcon />}
-                          sx={{ py: 1.5, borderRadius: 2 }}
-                        >
-                          Download Invoice
-                        </Button>
-                        
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          size="large"
-                          startIcon={<SupportIcon />}
-                          sx={{ py: 1.5, borderRadius: 2 }}
-                        >
-                          Contact Support
-                        </Button>
-                      </Box>
+                      <List dense>
+                        <ListItem>
+                          <ListItemIcon>
+                            <PersonIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Role" 
+                            secondary={
+                              <Chip 
+                                label={userData.role} 
+                                color={userData.role === 'admin' ? 'primary' : 'default'}
+                                size="small"
+                              />
+                            } 
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemIcon>
+                            <CalendarIcon color="primary" />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary="Member Since" 
+                            secondary={userData.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'} 
+                          />
+                        </ListItem>
+                        {userData.advanceAmount && (
+                          <ListItem>
+                            <ListItemIcon>
+                              <WalletIcon color="primary" />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary="Advance Amount" 
+                              secondary={`Rs. ${userData.advanceAmount.toLocaleString()}`} 
+                            />
+                          </ListItem>
+                        )}
+                      </List>
 
-                      {totalBalance > 0 && (
-                        <Alert 
-                          severity="warning" 
-                          sx={{ 
-                            mt: 2,
-                            borderRadius: 2,
-                            background: alpha(theme.palette.warning.main, 0.1)
-                          }}
-                          action={
-                            <Button color="warning" size="small" variant="contained">
-                              Pay Now
-                            </Button>
-                          }
-                        >
-                          <Typography variant="body2" fontWeight="600">
-                            Outstanding Balance: Rs. {totalBalance.toLocaleString()}
+                      {/* NIC Documents Section */}
+                      {(userData.nicDocuments?.front || userData.nicDocuments?.back) && (
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                            NIC Documents
                           </Typography>
-                        </Alert>
+                          <Grid container spacing={2}>
+                            {userData.nicDocuments?.front && (
+                              <Grid item xs={6}>
+                                <Box 
+                                  sx={{ 
+                                    textAlign: 'center',
+                                    p: 1,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    borderRadius: 2,
+                                    backgroundColor: theme.palette.background.default
+                                  }}
+                                >
+                                  <Typography variant="caption" display="block" gutterBottom>
+                                    NIC Front
+                                  </Typography>
+                                  <Box
+                                    component="img"
+                                    src={userData.nicDocuments.front.url}
+                                    alt="NIC Front"
+                                    sx={{
+                                      width: '100%',
+                                      maxWidth: 120,
+                                      height: 80,
+                                      objectFit: 'cover',
+                                      borderRadius: 1,
+                                      cursor: 'pointer',
+                                      '&:hover': {
+                                        transform: 'scale(1.05)',
+                                        transition: 'transform 0.3s'
+                                      }
+                                    }}
+                                    onClick={() => window.open(userData.nicDocuments.front.url, '_blank')}
+                                  />
+                                </Box>
+                              </Grid>
+                            )}
+                            {userData.nicDocuments?.back && (
+                              <Grid item xs={6}>
+                                <Box 
+                                  sx={{ 
+                                    textAlign: 'center',
+                                    p: 1,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    borderRadius: 2,
+                                    backgroundColor: theme.palette.background.default
+                                  }}
+                                >
+                                  <Typography variant="caption" display="block" gutterBottom>
+                                    NIC Back
+                                  </Typography>
+                                  <Box
+                                    component="img"
+                                    src={userData.nicDocuments.back.url}
+                                    alt="NIC Back"
+                                    sx={{
+                                      width: '100%',
+                                      maxWidth: 120,
+                                      height: 80,
+                                      objectFit: 'cover',
+                                      borderRadius: 1,
+                                      cursor: 'pointer',
+                                      '&:hover': {
+                                        transform: 'scale(1.05)',
+                                        transition: 'transform 0.3s'
+                                      }
+                                    }}
+                                    onClick={() => window.open(userData.nicDocuments.back.url, '_blank')}
+                                  />
+                                </Box>
+                              </Grid>
+                            )}
+                          </Grid>
+                        </Box>
                       )}
                     </CardContent>
                   </Card>
-                </Grid> */}
+                </Grid>
               </Grid>
             </Grid>
 
             {/* Right Side - Tabs Content */}
             <Grid item xs={12} lg={8}>
               <Card 
-                elevation={4}
+                elevation={3}
                 sx={{ 
-                  borderRadius: 3,
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-                  backdropFilter: 'blur(10px)'
+                  borderRadius: 2,
                 }}
               >
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -1044,7 +903,7 @@ export default function UserDashboard() {
                                 sx={{ 
                                   p: 3, 
                                   borderRadius: 2,
-                                  background: `linear-gradient(135deg, ${theme.palette.info.light} 0%, ${theme.palette.info.main} 100%)`,
+                                  background: theme.palette.info.main,
                                   color: 'white'
                                 }}
                               >
@@ -1069,7 +928,7 @@ export default function UserDashboard() {
                                   </Grid>
                                   <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>Total Paid</Typography>
-                                    <Typography variant="h6" fontWeight="600" color="b">Rs. {summary.totalPaid.toLocaleString()}</Typography>
+                                    <Typography variant="h6" fontWeight="600">Rs. {summary.totalPaid.toLocaleString()}</Typography>
                                   </Grid>
                                 </Grid>
                                 <Divider sx={{ my: 2, opacity: 0.3 }} />
@@ -1111,7 +970,6 @@ export default function UserDashboard() {
                                 <TableCell>Type</TableCell>
                                 <TableCell>Date</TableCell>
                                 <TableCell align="right">Amount</TableCell>
-                                <TableCell align="right">Status</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -1135,9 +993,6 @@ export default function UserDashboard() {
                                       Rs. {transaction.amount?.toLocaleString()}
                                     </Typography>
                                   </TableCell>
-                                  {/* <TableCell align="right">
-                                    {getStatusChip(calculateRemainingBalance(transaction.amount, transaction.receivedAmount || transaction.paidAmount))}
-                                  </TableCell> */}
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -1159,7 +1014,6 @@ export default function UserDashboard() {
                       <Typography variant="h6" fontWeight="600" gutterBottom>
                         Complete Transaction History
                       </Typography>
-                      {/* Full transaction table would go here */}
                       <Box sx={{ textAlign: 'center', py: 4 }}>
                         <ReceiptIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                         <Typography variant="body1" color="text.secondary">
@@ -1183,9 +1037,7 @@ export default function UserDashboard() {
         fullWidth
         PaperProps={{ 
           sx: { 
-            borderRadius: 3,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
-            backdropFilter: 'blur(20px)'
+            borderRadius: 2,
           } 
         }}
       >
@@ -1205,7 +1057,6 @@ export default function UserDashboard() {
               onChange={handleChange}
               margin="normal"
               variant="outlined"
-              sx={{ borderRadius: 2 }}
             />
             <TextField
               fullWidth
@@ -1215,7 +1066,6 @@ export default function UserDashboard() {
               onChange={handleChange}
               margin="normal"
               variant="outlined"
-              sx={{ borderRadius: 2 }}
             />
             <TextField
               fullWidth
@@ -1226,7 +1076,6 @@ export default function UserDashboard() {
               margin="normal"
               helperText="Email cannot be changed"
               variant="outlined"
-              sx={{ borderRadius: 2 }}
             />
           </Box>
         </DialogContent>
@@ -1245,7 +1094,6 @@ export default function UserDashboard() {
             sx={{ 
               borderRadius: 2, 
               px: 3,
-              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
             }}
           >
             Update Profile

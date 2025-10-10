@@ -206,84 +206,79 @@ export default function AdminDashboard() {
     setSelectedUserForShare(null);
   };
 
- const generateMonthlyQuotation = (user) => {
-  if (!user) return '';
+  const generateMonthlyQuotation = (user) => {
+    if (!user) return '';
 
-  // UserCard ke same calculations use karein
-  const userRents = monthlyRents.filter(
-    rent => rent.userId === user.id && 
-    rent.month === selectedMonth && 
-    rent.year === selectedYear
-  );
-  
-  const userBills = monthlyBills.filter(
-    bill => bill.userId === user.id && 
-    bill.month === selectedMonth && 
-    bill.year === selectedYear
-  );
+    // UserCard ke same calculations use karein
+    const userRents = monthlyRents.filter(
+      rent => rent.userId === user.id &&
+        rent.month === selectedMonth &&
+        rent.year === selectedYear
+    );
 
-  // Current month ke totals - exactly UserCard ke hisaab se
-  const totalRent = userRents.reduce((sum, rent) => sum + (Number(rent.amount) || 0), 0);
-  const receivedRent = userRents.reduce((sum, rent) => sum + (Number(rent.receivedAmount) || 0), 0);
-  const totalBill = userBills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
-  const paidBill = userBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
+    const userBills = monthlyBills.filter(
+      bill => bill.userId === user.id &&
+        bill.month === selectedMonth &&
+        bill.year === selectedYear
+    );
 
-  const total = totalRent + totalBill;
-  const received = receivedRent + paidBill;
-  const monthBalance = total - received;
+    // Current month ke totals - exactly UserCard ke hisaab se
+    const totalRent = userRents.reduce((sum, rent) => sum + (Number(rent.amount) || 0), 0);
+    const receivedRent = userRents.reduce((sum, rent) => sum + (Number(rent.receivedAmount) || 0), 0);
+    const totalBill = userBills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
+    const paidBill = userBills.reduce((sum, bill) => sum + (Number(bill.paidAmount) || 0), 0);
 
-  // Previous balance - exactly UserCard ke hisaab se
-  const previousRents = monthlyRents.filter(rent => {
-    if (rent.userId !== user.id) return false;
-    
-    const rentDate = new Date(`${rent.month} 1, ${rent.year}`);
-    const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
-    
-    return rentDate < selectedDate;
-  });
-  
-  const previousBills = monthlyBills.filter(bill => {
-    if (bill.userId !== user.id) return false;
-    
-    const billDate = new Date(`${bill.month} 1, ${bill.year}`);
-    const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
-    
-    return billDate < selectedDate;
-  });
+    const total = totalRent + totalBill;
+    const received = receivedRent + paidBill;
+    const monthBalance = total - received;
 
-  const previousRentBalance = previousRents.reduce((sum, rent) => {
-    const rentAmount = Number(rent.amount) || 0;
-    const receivedAmount = Number(rent.receivedAmount) || 0;
-    return sum + Math.max(0, rentAmount - receivedAmount);
-  }, 0);
+    // Previous balance - exactly UserCard ke hisaab se
+    const previousRents = monthlyRents.filter(rent => {
+      if (rent.userId !== user.id) return false;
 
-  const previousBillBalance = previousBills.reduce((sum, bill) => {
-    const billAmount = Number(bill.amount) || 0;
-    const paidAmount = Number(bill.paidAmount) || 0;
-    return sum + Math.max(0, billAmount - paidAmount);
-  }, 0);
+      const rentDate = new Date(`${rent.month} 1, ${rent.year}`);
+      const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
 
-  const previousBalance = previousRentBalance + previousBillBalance;
-  const currentBalance = previousBalance + monthBalance;
+      return rentDate < selectedDate;
+    });
 
-  // Detailed breakdown - UserCard ke format ke hisaab se
-  const rentBreakdown = userRents.map(rent => {
-    const rentAmount = Number(rent.amount) || 0;
-    const receivedAmount = Number(rent.receivedAmount) || 0;
-    const remaining = rentAmount - receivedAmount;
-    
-    return `• Monthly Rent: Rs. ${rentAmount.toLocaleString()} (Received: Rs. ${receivedAmount.toLocaleString()}, Due: Rs. ${remaining.toLocaleString()})`;
-  }).join('\n');
+    const previousBills = monthlyBills.filter(bill => {
+      if (bill.userId !== user.id) return false;
 
-  const billBreakdown = userBills.map(bill => {
-    const billAmount = Number(bill.amount) || 0;
-    const paidAmount = Number(bill.paidAmount) || 0;
-    const remaining = billAmount - paidAmount;
-    
-    return `• ${getTransactionTypeLabel('bill', bill.type)}: Rs. ${billAmount.toLocaleString()} (Paid: Rs. ${paidAmount.toLocaleString()}, Due: Rs. ${remaining.toLocaleString()})`;
-  }).join('\n');
+      const billDate = new Date(`${bill.month} 1, ${bill.year}`);
+      const selectedDate = new Date(`${selectedMonth} 1, ${selectedYear}`);
 
-  return `🏠 *Monthly Quotation - ${selectedMonth} ${selectedYear}*
+      return billDate < selectedDate;
+    });
+
+    const previousRentBalance = previousRents.reduce((sum, rent) => {
+      const rentAmount = Number(rent.amount) || 0;
+      const receivedAmount = Number(rent.receivedAmount) || 0;
+      return sum + Math.max(0, rentAmount - receivedAmount);
+    }, 0);
+
+    const previousBillBalance = previousBills.reduce((sum, bill) => {
+      const billAmount = Number(bill.amount) || 0;
+      const paidAmount = Number(bill.paidAmount) || 0;
+      return sum + Math.max(0, billAmount - paidAmount);
+    }, 0);
+
+    const previousBalance = previousRentBalance + previousBillBalance;
+    const currentBalance = previousBalance + monthBalance;
+
+    // Detailed breakdown - UserCard ke format ke hisaab se
+    const rentBreakdown = userRents.map(rent => {
+      const rentAmount = Number(rent.amount) || 0;
+
+      return `• Monthly Rent: Rs. ${rentAmount.toLocaleString()})`;
+    });
+
+    const billBreakdown = userBills.map(bill => {
+
+      return `• ${getTransactionTypeLabel('bill', bill.type)}}`;
+    }).join('\n');
+
+    return `🏠 *Monthly Quotation - ${selectedMonth} ${selectedYear}*
 
 👤 *Tenant Details:*
 • Name: ${user.firstName} ${user.lastName}
@@ -292,7 +287,6 @@ export default function AdminDashboard() {
 📊 *Payment Summary:*
 
 *Previous Balance: Rs. ${previousBalance.toLocaleString()}*
-
 *Current Month (${selectedMonth} ${selectedYear}):*
 ${rentBreakdown || '• No rent entries for this month'}
 
@@ -304,13 +298,9 @@ ${billBreakdown || '• No bills for this month'}
 • Total Received/Paid: Rs. ${received.toLocaleString()}
 • Month Balance: Rs. ${monthBalance.toLocaleString()}
 
-💰 *GRAND TOTAL DUE: Rs. ${currentBalance.toLocaleString()}*
-
-📅 Due Date: 5th of next month
-📍 Please make payments by the due date to avoid late fees.
-
+*GRAND TOTAL DUE: Rs. ${currentBalance.toLocaleString()}*
 Thank you for your timely payments! 🏡`;
-};
+  };
 
   const shareViaWhatsApp = (user) => {
     const message = generateMonthlyQuotation(user);
@@ -1329,8 +1319,8 @@ Thank you for your timely payments! 🏡`;
           </Box>
           <Box display="flex" alignItems="center">
             <Tooltip title="Share Monthly Quotations">
-              <IconButton 
-                color="inherit" 
+              <IconButton
+                color="inherit"
                 onClick={(e) => handleShareClick(e)}
                 sx={{ mr: 1 }}
               >
@@ -1625,28 +1615,28 @@ Thank you for your timely payments! 🏡`;
           <Grid container spacing={3} sx={{ p: 2 }}>
             {users.map((user) => (
               <Grid item xs={12} md={6} lg={4} key={user.id}>
-               <UserCard
-  user={user}
-  monthlyRents={monthlyRents}
-  monthlyBills={monthlyBills}
-  handleOpenDialog={handleOpenDialog}
-  handleDeleteUser={handleDeleteUser}
-  handleOpenRentDialog={handleOpenRentDialog}
-  handleOpenBillDialog={handleOpenBillDialog}
-  handleDeleteRent={handleDeleteRent}
-  handleDeleteBill={handleDeleteBill}
-  theme={theme}
-  months={months}
-  years={years}
-  getTransactionTypeLabel={getTransactionTypeLabel}
-  getTransactionIcon={getTransactionIcon}
-  calculateRemainingBalance={calculateRemainingBalance}
-  getStatusColor={getStatusColor}
-  currentUser={currentUser}
-  updateRentEntry={updateRentEntry}
-  updateBillEntry={updateBillEntry}
-  onShareClick={handleShareClick} // Yeh line add karein
-/>
+                <UserCard
+                  user={user}
+                  monthlyRents={monthlyRents}
+                  monthlyBills={monthlyBills}
+                  handleOpenDialog={handleOpenDialog}
+                  handleDeleteUser={handleDeleteUser}
+                  handleOpenRentDialog={handleOpenRentDialog}
+                  handleOpenBillDialog={handleOpenBillDialog}
+                  handleDeleteRent={handleDeleteRent}
+                  handleDeleteBill={handleDeleteBill}
+                  theme={theme}
+                  months={months}
+                  years={years}
+                  getTransactionTypeLabel={getTransactionTypeLabel}
+                  getTransactionIcon={getTransactionIcon}
+                  calculateRemainingBalance={calculateRemainingBalance}
+                  getStatusColor={getStatusColor}
+                  currentUser={currentUser}
+                  updateRentEntry={updateRentEntry}
+                  updateBillEntry={updateBillEntry}
+                  onShareClick={handleShareClick} // Yeh line add karein
+                />
               </Grid>
             ))}
           </Grid>
